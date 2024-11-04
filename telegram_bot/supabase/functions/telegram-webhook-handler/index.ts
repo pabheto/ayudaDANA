@@ -1,11 +1,15 @@
 import { Bot, webhookCallback } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
-import { createClient } from "https://deno.land/x/supabase@1.0.0/mod.ts"; // Versión específica de Supabase
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseKey = Deno.env.get("SUPABASE_KEY") || "";
+const supabaseUrl = Deno.env.get("URL_SUPABASE") || throw new Error("URL_SUPABASE is not defined");
+const supabaseKey = Deno.env.get("KEY_SUPABASE") || throw new Error("KEY_SUPABASE is not defined");
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const bot = new Bot(Deno.env.get("TELEGRAM_BOT_TOKEN") || "");
+
+// Middleware para usar el almacenamiento de sesión en Supabase
+bot.use(session({ initial: (): SessionData => ({}), storage: supabaseSessionStorage }));
 
 // Preguntas iniciales para las madres que solicitan ayuda
 const initialFormQuestions = [
@@ -95,7 +99,7 @@ async function askCollaboratorFormQuestions(ctx: any, questionIndex: number) {
 
 // Responder al formulario de madre
 bot.on("message:text", async (ctx) => {
-  if (ctx.session.motherQuestionIndex != null) {
+  if (ctx.session?.motherQuestionIndex != null) {
     const questionIndex = ctx.session.motherQuestionIndex;
     ctx.session.answers[questionIndex] = ctx.message.text;
     await askMotherFormQuestions(ctx, questionIndex + 1);

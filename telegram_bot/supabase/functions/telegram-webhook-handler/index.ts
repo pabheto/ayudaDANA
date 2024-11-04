@@ -1,18 +1,61 @@
-import { Bot, webhookCallback } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
+import { Bot, webhookCallback, session } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const supabaseUrl = Deno.env.get("URL_SUPABASE") || throw new Error("URL_SUPABASE is not defined");
-const supabaseKey = Deno.env.get("KEY_SUPABASE") || throw new Error("KEY_SUPABASE is not defined");
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const bot = new Bot(Deno.env.get("TELEGRAM_BOT_TOKEN") || "");
 
+export interface SessionData {
+  motherQuestionIndex?: number; // Índice de la pregunta actual en el formulario de madres
+  collaboratorQuestionIndex?: number; // Índice de la pregunta actual en el formulario de colaboradores
+  helpRequestQuestionIndex?: number; // Índice de la pregunta actual en el formulario de solicitud de ayuda
+  answers?: string[]; // Respuestas acumuladas del formulario de madres
+  collaboratorAnswers?: string[]; // Respuestas acumuladas del formulario de colaboradores
+  helpRequestAnswers?: string[]; // Respuestas acumuladas del formulario de solicitud de ayuda
+}
+
+const supabaseSessionStorage = {
+  async read(key: string): Promise<SessionData | undefined> {
+    const { data, error } = await supabase.from("telegram_grammy_sessions").select("*").eq("session_id", key).single();
+
+    if (error) {
+      console.error("Error reading session from database:", error);
+      return undefined;
+    }
+
+    return data?.session_data || undefined;
+  },
+
+  async write(key: string, value: SessionData): Promise<void> {
+    const { error } = await supabase.from("telegram_grammy_sessions").upsert({
+      session_id: key,
+      session_data: value,
+    });
+
+    if (error) {
+      console.error("Error writing session to database:", error);
+    }
+  },
+
+  async delete(key: string): Promise<void> {
+    const { error } = await supabase.from("telegram_grammy_sessions").delete().eq("session_id", key);
+
+    if (error) {
+      console.error("Error deleting session from database:", error);
+    }
+  },
+};
+
 // Middleware para usar el almacenamiento de sesión en Supabase
 bot.use(session({ initial: (): SessionData => ({}), storage: supabaseSessionStorage }));
 
+export default supabaseSessionStorage;
+
 // Preguntas iniciales para las madres que solicitan ayuda
-const initialFormQuestions = [
+const initialMotherFormQuestions = [
   "Nombre completo",
   "Contacto",
   "Ubicación",

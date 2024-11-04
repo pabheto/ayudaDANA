@@ -1,4 +1,8 @@
-import { Bot, webhookCallback, session } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
+import {
+  Bot,
+  session,
+  webhookCallback,
+} from "https://deno.land/x/grammy@v1.8.3/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -17,9 +21,22 @@ export interface SessionData {
   helpRequestAnswers?: string[]; // Respuestas acumuladas del formulario de solicitud de ayuda
 }
 
+const initialSessionData: SessionData = {
+  motherQuestionIndex: 0,
+  collaboratorQuestionIndex: 0,
+  helpRequestQuestionIndex: 0,
+  answers: [],
+  collaboratorAnswers: [],
+  helpRequestAnswers: [],
+};
+
 const supabaseSessionStorage = {
   async read(key: string): Promise<SessionData | undefined> {
-    const { data, error } = await supabase.from("telegram_grammy_sessions").select("*").eq("session_id", key).single();
+    const { data, error } = await supabase
+      .from("telegram_grammy_sessions")
+      .select("*")
+      .eq("session_id", key)
+      .single();
 
     if (error) {
       console.error("Error reading session from database:", error);
@@ -30,18 +47,30 @@ const supabaseSessionStorage = {
   },
 
   async write(key: string, value: SessionData): Promise<void> {
-    const { error } = await supabase.from("telegram_grammy_sessions").upsert({
-      session_id: key,
-      session_data: value,
-    });
+    try {
+      const { error } = await supabase.from("telegram_grammy_sessions").upsert(
+        {
+          session_id: key,
+          session_data: value,
+        },
+        {
+          onConflict: "session_id",
+        }
+      );
 
-    if (error) {
+      if (error) {
+        console.error("Error writing session to database:", error);
+      }
+    } catch (error) {
       console.error("Error writing session to database:", error);
     }
   },
 
   async delete(key: string): Promise<void> {
-    const { error } = await supabase.from("telegram_grammy_sessions").delete().eq("session_id", key);
+    const { error } = await supabase
+      .from("telegram_grammy_sessions")
+      .delete()
+      .eq("session_id", key);
 
     if (error) {
       console.error("Error deleting session from database:", error);
@@ -50,9 +79,12 @@ const supabaseSessionStorage = {
 };
 
 // Middleware para usar el almacenamiento de sesión en Supabase
-bot.use(session({ initial: (): SessionData => ({}), storage: supabaseSessionStorage }));
-
-export default supabaseSessionStorage;
+bot.use(
+  session({
+    initial: (): SessionData => initialSessionData,
+    storage: supabaseSessionStorage,
+  })
+);
 
 // Preguntas iniciales para las madres que solicitan ayuda
 const initialMotherFormQuestions = [
@@ -75,7 +107,11 @@ const initialCollaboratorFormQuestions = [
 ];
 
 // Preguntas de solicitud de ayuda
-const helpRequestQuestions = ["Nivel de urgencia", "¿Qué profesional necesitas?", "Motivo de consulta"];
+const helpRequestQuestions = [
+  "Nivel de urgencia",
+  "¿Qué profesional necesitas?",
+  "Motivo de consulta",
+];
 
 // Lista de especialidades
 const specialities = [
@@ -108,10 +144,14 @@ bot.on("callback_query:data", async (ctx) => {
   const choice = ctx.callbackQuery?.data;
 
   if (choice === "madre") {
-    await ctx.reply("Gracias por tu interés. Vamos a completar el formulario inicial.");
+    await ctx.reply(
+      "Gracias por tu interés. Vamos a completar el formulario inicial."
+    );
     await askMotherFormQuestions(ctx, 0); // Inicia las preguntas para madre
   } else if (choice === "colaborador") {
-    await ctx.reply("Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional.");
+    await ctx.reply(
+      "Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional."
+    );
     await askCollaboratorFormQuestions(ctx, 0); // Inicia las preguntas para colaborador
   }
 });
@@ -123,7 +163,9 @@ async function askMotherFormQuestions(ctx: any, questionIndex: number) {
     await ctx.reply(initialMotherFormQuestions[questionIndex]);
   } else {
     await saveMother(ctx.from?.id, ctx.session.answers); // Guardar respuestas en la base de datos
-    await ctx.reply("Formulario completado. Ahora puedes solicitar ayuda con el comando /ayuda.");
+    await ctx.reply(
+      "Formulario completado. Ahora puedes solicitar ayuda con el comando /ayuda."
+    );
     ctx.session.answers = [];
   }
 }
@@ -135,7 +177,9 @@ async function askCollaboratorFormQuestions(ctx: any, questionIndex: number) {
     await ctx.reply(initialCollaboratorFormQuestions[questionIndex]);
   } else {
     await saveCollaborator(ctx.from?.id, ctx.session.collaboratorAnswers); // Guardar respuestas en la base de datos
-    await ctx.reply("Formulario de colaborador completado. Gracias por ofrecer tu ayuda.");
+    await ctx.reply(
+      "Formulario de colaborador completado. Gracias por ofrecer tu ayuda."
+    );
     ctx.session.collaboratorAnswers = [];
   }
 }
@@ -162,7 +206,9 @@ bot.command("ayuda", async (ctx) => {
     await ctx.reply("Por favor responde las siguientes preguntas:");
     await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
   } else {
-    await ctx.reply("Primero debes completar el formulario inicial usando el comando /start.");
+    await ctx.reply(
+      "Primero debes completar el formulario inicial usando el comando /start."
+    );
   }
 });
 
@@ -178,7 +224,9 @@ async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
     }
   } else {
     await saveHelpRequest(ctx.from?.id, ctx.session.helpRequestAnswers); // Guardar solicitud en la base de datos
-    await ctx.reply("Solicitud de ayuda enviada. Pronto nos pondremos en contacto contigo.");
+    await ctx.reply(
+      "Solicitud de ayuda enviada. Pronto nos pondremos en contacto contigo."
+    );
     ctx.session.helpRequestAnswers = [];
   }
 }
@@ -194,7 +242,11 @@ bot.on("message:text", async (ctx) => {
 
 async function checkMotherExists(userId: number | undefined): Promise<boolean> {
   if (!userId) return false;
-  const { data, error } = await supabase.from("mothers").select("id").eq("telegram_id", userId).single();
+  const { data, error } = await supabase
+    .from("mothers")
+    .select("id")
+    .eq("telegram_id", userId)
+    .single();
 
   if (error) {
     console.error("Error checking mother:", error);
@@ -204,10 +256,20 @@ async function checkMotherExists(userId: number | undefined): Promise<boolean> {
   return !!data;
 }
 
-async function saveMother(userId: number | undefined, answers: string[]): Promise<void> {
+async function saveMother(
+  userId: number | undefined,
+  answers: string[]
+): Promise<void> {
   if (!userId || answers.length < 6) return;
 
-  const [nombreCompleto, contacto, ubicacion, puebloAfectado, codigoPostal, descripcion] = answers;
+  const [
+    nombreCompleto,
+    contacto,
+    ubicacion,
+    puebloAfectado,
+    codigoPostal,
+    descripcion,
+  ] = answers;
 
   const { error } = await supabase.from("mothers").insert({
     telegram_id: userId,
@@ -222,7 +284,10 @@ async function saveMother(userId: number | undefined, answers: string[]): Promis
   if (error) console.error("Error saving mother:", error);
 }
 
-async function saveCollaborator(userId: number | undefined, answers: string[]): Promise<void> {
+async function saveCollaborator(
+  userId: number | undefined,
+  answers: string[]
+): Promise<void> {
   if (!userId || answers.length < 5) return;
 
   const [
@@ -251,7 +316,10 @@ async function saveCollaborator(userId: number | undefined, answers: string[]): 
   }
 }
 
-async function saveHelpRequest(userId: number | undefined, answers: string[]): Promise<void> {
+async function saveHelpRequest(
+  userId: number | undefined,
+  answers: string[]
+): Promise<void> {
   if (!userId || answers.length < 3) return;
 
   const [nivelUrgencia, especialidad, motivoConsulta] = answers;

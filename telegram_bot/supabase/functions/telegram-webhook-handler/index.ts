@@ -1,59 +1,31 @@
-// archivo webhook.js
-import { createClient } from "@supabase/supabase-js";
+// Follow this setup guide to integrate the Deno language server with your editor:
+// https://deno.land/manual/getting_started/setup_your_environment
+// This enables autocomplete, go to definition, etc.
 
-const supabaseUrl = process.env.SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? "";
+console.log(`Function "telegram-bot" up and running!`);
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { Bot, webhookCallback } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
 
-export default async function handler(req, res) {
-  const { message } = req.body; // Extract the received message
+const bot = new Bot(Deno.env.get("TELEGRAM_BOT_TOKEN") || "");
 
-  if (!message || !message.text) {
-    res.status(400).json({ error: "Invalid message" });
-    return;
+bot.command("start", (ctx) => ctx.reply("Welcome! Up and running."));
+
+bot.command("ping", (ctx) => ctx.reply(`Pong! ${new Date()} ${Date.now()}`));
+
+// Adding a message handler
+bot.on("message", (ctx) => ctx.reply("Received your message!"));
+
+const handleUpdate = webhookCallback(bot, "std/http");
+
+Deno.serve(async (req) => {
+  try {
+    const url = new URL(req.url);
+    if (url.searchParams.get("secret") !== Deno.env.get("FUNCTION_SECRET")) {
+      return new Response("not allowed", { status: 405 });
+    }
+
+    return await handleUpdate(req);
+  } catch (err) {
+    console.error(err);
   }
-
-  const responseMessage = await handleUserMessage(message); // Process received message
-  await sendTelegramMessage(message.chat.id, responseMessage);
-
-  res.status(200).json({ status: "Message sent" });
-}
-
-async function handleUserMessage(message) {
-  const text = message.text.toLowerCase();
-
-  if (text === "/start") {
-    return `Hello ${message.from.first_name}! Welcome to the bot.`;
-  } else if (text.startsWith("/info")) {
-    const userInfo = await fetchUserInfoFromDatabase(message.from.id);
-    return userInfo || "No information found for this user.";
-  } else {
-    return "Unrecognized command. Use /start or /info to interact.";
-  }
-}
-
-async function fetchUserInfoFromDatabase(userId) {
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("telegram_id", userId)
-    .single();
-  return error
-    ? "Error retrieving user data."
-    : `User data: ${JSON.stringify(data)}`;
-}
-
-async function sendTelegramMessage(chatId, text) {
-  const telegramToken = "YOUR_TELEGRAM_BOT_TOKEN";
-  const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
-
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-    }),
-  });
-}
+});

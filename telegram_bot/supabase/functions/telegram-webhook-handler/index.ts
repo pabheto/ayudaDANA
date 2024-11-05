@@ -1,6 +1,16 @@
-import { session, webhookCallback } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
-import { askCollaboratorFormQuestions, handleCollaboratorButtonsCallbacks, handleCollaboratorTextCallbacks } from "./helpers/collaborators.ts";
-import { handleHelpRequestsTextCallbacks, handleHelpRequestsButtonsCallbacks } from "./helpers/helpRequests.ts";
+import {
+  session,
+  webhookCallback,
+} from "https://deno.land/x/grammy@v1.8.3/mod.ts";
+import {
+  askCollaboratorFormQuestions,
+  handleCollaboratorButtonsCallbacks,
+  handleCollaboratorTextCallbacks,
+} from "./helpers/collaborators.ts";
+import {
+  handleHelpRequestsButtonsCallbacks,
+  handleHelpRequestsTextCallbacks,
+} from "./helpers/helpRequests.ts";
 import {
   askMotherFormQuestions,
   checkMotherExists,
@@ -55,7 +65,8 @@ const initialSessionData: SessionData = {
 
 const supabaseSessionStorage = {
   async read(key: string): Promise<SessionData | undefined> {
-    const { data, error } = await supabase.from("telegram_grammy_sessions").select("*").eq("session_id", key).single();
+    const { data, error } = await supabase.from("telegram_grammy_sessions")
+      .select("*").eq("session_id", key).single();
 
     if (error) {
       console.error("Error reading session from database:", error);
@@ -74,7 +85,7 @@ const supabaseSessionStorage = {
         },
         {
           onConflict: "session_id",
-        }
+        },
       );
 
       if (error) {
@@ -86,7 +97,8 @@ const supabaseSessionStorage = {
   },
 
   async delete(key: string): Promise<void> {
-    const { error } = await supabase.from("telegram_grammy_sessions").delete().eq("session_id", key);
+    const { error } = await supabase.from("telegram_grammy_sessions").delete()
+      .eq("session_id", key);
 
     if (error) {
       console.error("Error deleting session from database:", error);
@@ -99,7 +111,7 @@ telegramBot.use(
   session({
     initial: (): SessionData => initialSessionData,
     storage: supabaseSessionStorage,
-  })
+  }),
 );
 
 // Comando /start para iniciar el flujo de selección
@@ -136,14 +148,20 @@ telegramBot.on("callback_query:data", async (ctx) => {
     return;
   }
 
-  if (ctx.session.role === AvailableRoles.MOTHER || ctx.session.motherQuestionIndex !== undefined) {
+  if (
+    ctx.session.role === AvailableRoles.MOTHER ||
+    ctx.session.motherQuestionIndex !== undefined
+  ) {
     await handleHelpRequestsButtonsCallbacks(ctx);
     await handleMotherButtonsCallbacks(ctx);
 
     return;
   }
 
-  if (ctx.session.collaboratorQuestionIndex != undefined || ctx.session.role === AvailableRoles.COLLABORATOR) {
+  if (
+    ctx.session.collaboratorQuestionIndex != undefined ||
+    ctx.session.role === AvailableRoles.COLLABORATOR
+  ) {
     await handleCollaboratorButtonsCallbacks(ctx);
 
     return;
@@ -152,13 +170,17 @@ telegramBot.on("callback_query:data", async (ctx) => {
   const choice = ctx.callbackQuery?.data;
 
   if (choice === "role_madre") {
-    await ctx.reply("Gracias. Vamos a completar el formulario inicial para crear la conexión madre-profesional.");
+    await ctx.reply(
+      "Gracias. Vamos a completar el formulario inicial para crear la conexión madre-profesional.",
+    );
     await flushSessionForms(ctx); // Resetear los formularios en la sesión
     await askMotherFormQuestions(ctx, 0); // Inicia las preguntas para madre
   }
 
   if (choice === "role_colaborador") {
-    await ctx.reply("Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional.");
+    await ctx.reply(
+      "Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional.",
+    );
     await flushSessionForms(ctx);
     await askCollaboratorFormQuestions(ctx, 0); // Inicia las preguntas para colaborador
   }
@@ -175,11 +197,17 @@ telegramBot.on("message:text", async (ctx) => {
 
   // Primero, comprobar si se está rellenando algún formulario
 
-  if (ctx.session.collaboratorQuestionIndex != undefined || ctx.session.role === AvailableRoles.COLLABORATOR) {
+  if (
+    ctx.session.collaboratorQuestionIndex != undefined ||
+    ctx.session.role === AvailableRoles.COLLABORATOR
+  ) {
     await handleCollaboratorTextCallbacks(ctx);
   }
 
-  if (ctx.session.motherQuestionIndex != undefined || ctx.session.role === AvailableRoles.MOTHER) {
+  if (
+    ctx.session.motherQuestionIndex != undefined ||
+    ctx.session.role === AvailableRoles.MOTHER
+  ) {
     await handleMotherTextCallbacks(ctx);
   }
 

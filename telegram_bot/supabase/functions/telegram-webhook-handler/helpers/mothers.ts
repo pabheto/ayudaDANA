@@ -80,13 +80,13 @@ export async function askMotherFormQuestions(ctx: any, questionIndex: number) {
     await ctx.reply(initialMotherFormQuestions[questionIndex]);
   } else {
     // Si no hay más preguntas, guardar respuestas y cambiar el rol a madre
-    ctx.session.role = AvailableRoles.MOTHER;
-    ctx.session.motherQuestionIndex = undefined;
-    ctx.session.motherAnswers = [];
     await saveMother(ctx.from?.id, ctx.session.motherAnswers); // Guardar respuestas en la base de datos
     await ctx.reply(
       "Formulario completado. Ahora puedes solicitar ayuda con el comando /ayuda.",
     );
+    ctx.session.role = AvailableRoles.MOTHER;
+    ctx.session.motherQuestionIndex = undefined;
+    ctx.session.motherAnswers = [];
   }
 }
 //#endregion

@@ -71,13 +71,13 @@ export async function askCollaboratorFormQuestions(
     ctx.session.collaboratorQuestionIndex = questionIndex;
     await ctx.reply(initialCollaboratorFormQuestions[questionIndex]);
   } else {
-    ctx.session.role = AvailableRoles.COLLABORATOR;
     await saveCollaborator(ctx.from?.id, ctx.session.collaboratorAnswers);
-    ctx.session.collaboratorQuestionIndex = undefined;
-    ctx.session.collaboratorAnswers = [];
     await ctx.reply(
       "Formulario de colaborador completado. Gracias por ofrecer tu ayuda."
     );
+    ctx.session.role = AvailableRoles.COLLABORATOR;
+    ctx.session.collaboratorQuestionIndex = undefined;
+    ctx.session.collaboratorAnswers = [];
   }
 }
 //#endregion

@@ -163,11 +163,11 @@ telegramBot.command("start", async (ctx) => {
     }
   }
 
-  await ctx.reply("Bienvenido. ¿Eres madre o colaborador?", {
+  await ctx.reply("Bienvenido. ¿Eres madre o profesional?", {
     reply_markup: {
       inline_keyboard: [
         [{ text: "Madre", callback_data: "role_madre" }],
-        [{ text: "Colaborador", callback_data: "role_colaborador" }],
+        [{ text: "Profesional", callback_data: "role_colaborador" }],
       ],
     },
   });

@@ -14,14 +14,13 @@ export async function saveHelpRequest(
     nivel_urgencia: nivelUrgencia,
     especialidad: especialidad,
     motivo_consulta: motivoConsulta,
-    timestamp: new Date().toISOString(),
   });
 
   if (error) console.error("Error saving help request:", error);
 }
 //#endregion
 
-//#region Formulario de solicitud de ayuda
+//#region Formularios
 export const helpRequestQuestions = [
   "¿Cuál es el nivel de urgencia? (Alto/Medio/Bajo)",
   "¿Qué tipo de especialista necesitas?",
@@ -52,6 +51,7 @@ export async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
       "Solicitud de ayuda enviada. Pronto nos pondremos en contacto contigo."
     );
     ctx.session.helpRequestAnswers = [];
+    ctx.session.helpRequestQuestionIndex = undefined;
   }
 }
 //#endregion

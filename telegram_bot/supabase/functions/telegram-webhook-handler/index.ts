@@ -9,6 +9,8 @@ import {
   askMotherFormQuestions,
   checkMotherExists,
   showMainMotherMenu,
+  showMotherDataMenu,
+  showMotherHelpRequestsMenu,
 } from "./helpers/mothers.ts";
 import { supabase } from "./helpers/supabase.ts";
 
@@ -98,7 +100,10 @@ bot.use(
 // Comando /start para iniciar el flujo de selección
 bot.command("start", async (ctx) => {
   if (ctx.session.role === AvailableRoles.MOTHER) {
-    return await showMainMotherMenu(ctx);
+    const motherExists = await checkMotherExists(ctx.from?.id);
+    if (motherExists) {
+      return await showMainMotherMenu(ctx);
+    }
   }
 
   await ctx.reply("Bienvenido. ¿Eres madre o colaborador?", {
@@ -111,7 +116,7 @@ bot.command("start", async (ctx) => {
   });
 });
 
-// Manejo de selección de "Madre" o "Colaborador"
+// Manejo de las respuestas a botones
 bot.on("callback_query:data", async (ctx) => {
   const choice = ctx.callbackQuery?.data;
 
@@ -120,26 +125,45 @@ bot.on("callback_query:data", async (ctx) => {
       "Gracias por tu interés. Vamos a completar el formulario inicial."
     );
     await askMotherFormQuestions(ctx, 0); // Inicia las preguntas para madre
-  } else if (choice === "role_colaborador") {
+  }
+
+  if (choice === "role_colaborador") {
     await ctx.reply(
       "Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional."
     );
     await askCollaboratorFormQuestions(ctx, 0); // Inicia las preguntas para colaborador
   }
+
+  if (choice === "mother_pedir_ayuda") {
+    await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
+  }
+
+  if (choice === "mother_mis_datos") {
+    await showMotherDataMenu(ctx);
+  }
+
+  if (choice === "mother_mis_solicitudes") {
+    await showMotherHelpRequestsMenu(ctx);
+  }
 });
 
-// Responder al formulario de madre
+// Respuesta a mensajes de texto (principalmente para responder formularios)
 bot.on("message:text", async (ctx) => {
   // Primero, comprobar si se está rellenando algún formulario
   if (ctx.session?.motherQuestionIndex != undefined) {
     const questionIndex = ctx.session.motherQuestionIndex;
     ctx.session.motherAnswers[questionIndex] = ctx.message.text;
     await askMotherFormQuestions(ctx, questionIndex + 1);
-  } else if (ctx.session.collaboratorQuestionIndex != undefined) {
-    // Responder al formulario de colaborador
+  }
+  if (ctx.session.collaboratorQuestionIndex != undefined) {
     const questionIndex = ctx.session.collaboratorQuestionIndex;
     ctx.session.collaboratorAnswers[questionIndex] = ctx.message.text;
     await askCollaboratorFormQuestions(ctx, questionIndex + 1);
+  }
+  if (ctx.session.helpRequestQuestionIndex != null) {
+    const questionIndex = ctx.session.helpRequestQuestionIndex;
+    ctx.session.helpRequestAnswers[questionIndex] = ctx.message.text;
+    await askHelpRequestQuestions(ctx, questionIndex + 1);
   }
 });
 
@@ -152,20 +176,11 @@ bot.command("ayuda", async (ctx) => {
     if (motherExists) {
       await ctx.reply("Por favor responde las siguientes preguntas:");
       await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
-    } else {
-      await ctx.reply(
-        "Primero debes completar el formulario inicial usando el comando /start."
-      );
     }
-  }
-});
-
-// Responder al formulario de solicitud de ayuda
-bot.on("message:text", async (ctx) => {
-  if (ctx.session.helpRequestQuestionIndex != null) {
-    const questionIndex = ctx.session.helpRequestQuestionIndex;
-    ctx.session.helpRequestAnswers[questionIndex] = ctx.message.text;
-    await askHelpRequestQuestions(ctx, questionIndex + 1);
+  } else {
+    await ctx.reply(
+      "Primero te debes registrar como persona afectada en el sistema usando el comando /start."
+    );
   }
 });
 

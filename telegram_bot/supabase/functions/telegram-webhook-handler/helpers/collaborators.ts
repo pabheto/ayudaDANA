@@ -77,6 +77,7 @@ export async function askCollaboratorFormQuestions(
       "Formulario de colaborador completado. Gracias por ofrecer tu ayuda."
     );
     ctx.session.collaboratorAnswers = [];
+    ctx.session.collaboratorQuestionIndex = undefined;
   }
 }
 //#endregion

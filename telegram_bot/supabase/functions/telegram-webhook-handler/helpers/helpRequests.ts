@@ -6,20 +6,21 @@ import { Bot } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
 let bot: Bot;
 
 //#region Funciones CRUD para solicitudes de ayuda
-export async function saveHelpRequest(
-  userId: number | undefined,
-  answers: string[],
-): Promise<number | undefined> {
+export async function saveHelpRequest(userId: number | undefined, answers: string[]): Promise<number | undefined> {
   if (!userId || answers.length < 3) return;
 
   const [nivelUrgencia, especialidad, motivoConsulta] = answers;
 
-  const { data, error } = await supabase.from("help_requests").insert({
-    mother_telegram_id: userId,
-    nivel_urgencia: nivelUrgencia,
-    especialidad: especialidad,
-    motivo_consulta: motivoConsulta,
-  }).select("id").single();
+  const { data, error } = await supabase
+    .from("help_requests")
+    .insert({
+      mother_telegram_id: userId,
+      nivel_urgencia: nivelUrgencia,
+      especialidad: especialidad,
+      motivo_consulta: motivoConsulta,
+    })
+    .select("id")
+    .single();
 
   if (error) console.error("Error saving help request:", error);
 
@@ -28,11 +29,7 @@ export async function saveHelpRequest(
 }
 
 export async function getHelpRequest(helpRequestId: number) {
-  const { data, error } = await supabase
-    .from("help_requests")
-    .select("*")
-    .eq("id", helpRequestId)
-    .single();
+  const { data, error } = await supabase.from("help_requests").select("*").eq("id", helpRequestId).single();
 
   if (error) console.error("Error getting help request:", error);
 
@@ -69,9 +66,7 @@ function createSpecialitiesKeyboard() {
   // Recorrer las especialidades y añadirlas al teclado
   for (let i = 0; i < specialities.length; i += 2) {
     // Crear una fila con dos botones
-    const row = [
-      { text: specialities[i], callback_data: `specialty_${specialities[i]}` },
-    ];
+    const row = [{ text: specialities[i], callback_data: `specialty_${specialities[i]}` }];
 
     // Por cada fila, añadir un segundo botón si hay más especialidades
     if (i + 1 < specialities.length) {
@@ -105,10 +100,11 @@ export async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
       await ctx.reply(question);
     }
   } else {
-    await saveHelpRequest(ctx.from?.id, ctx.session.helpRequestAnswers);
-    await ctx.reply(
-      "Solicitud de ayuda enviada. Pronto nos pondremos en contacto contigo.",
-    );
+    const helpRequestId = await saveHelpRequest(ctx.from?.id, ctx.session.helpRequestAnswers);
+    // Enviar la solicitud de ayuda a los chats de streaming
+    streamHelpRequest(helpRequestId);
+
+    await ctx.reply("Solicitud de ayuda enviada. Pronto nos pondremos en contacto contigo.");
     ctx.session.helpRequestAnswers = [];
     ctx.session.helpRequestQuestionIndex = undefined;
   }
@@ -118,18 +114,14 @@ export async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
 export function setupSpecialityHandler(bot: any) {
   bot.action(/specialty_(.+)/, async (ctx: any) => {
     const specialty = ctx.match[1];
-    ctx.session.helpRequestAnswers[ctx.session.helpRequestQuestionIndex] =
-      specialty;
+    ctx.session.helpRequestAnswers[ctx.session.helpRequestQuestionIndex] = specialty;
 
     // Delete the menu message to keep the chat clean
     await ctx.deleteMessage();
 
     // Show selected specialty and move to next question
     await ctx.reply(`Especialidad seleccionada: ${specialty}`);
-    await askHelpRequestQuestions(
-      ctx,
-      ctx.session.helpRequestQuestionIndex + 1,
-    );
+    await askHelpRequestQuestions(ctx, ctx.session.helpRequestQuestionIndex + 1);
   });
 }
 
@@ -138,6 +130,7 @@ export function setupSpecialityHandler(bot: any) {
 //#region Gestión de solicitudes de ayuda en tiempo real
 const STREAM_HELP_REQUEST_CHAT_IDS = [412430132, 9150852, 280023];
 export async function streamHelpRequest(helpRequestId: number | undefined) {
+  console.log("Streaming help request", helpRequestId);
   if (!helpRequestId) return;
   const helpRequest = await getHelpRequest(helpRequestId);
 
@@ -149,12 +142,11 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
   const mother = await getMother(helpRequest.mother_telegram_id);
 
   if (!mother) {
-    console.error("Mother not found");
+    console.error("Mother not found ", helpRequest.mother_telegram_id);
     return;
   }
 
-  const message =
-    `Nueva solicitud de ayuda de ${mother.name} (${mother.telegram_id})
+  const message = `Nueva solicitud de ayuda de ${mother.name} (${mother.telegram_id})
     - Nivel de urgencia: ${helpRequest.nivel_urgencia}
     - Especialidad: ${helpRequest.especialidad}
     - Motivo de consulta: ${helpRequest.motivo_consulta}`;

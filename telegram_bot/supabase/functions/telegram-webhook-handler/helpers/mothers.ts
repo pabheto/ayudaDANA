@@ -9,6 +9,13 @@ export async function getMother(userId: number | undefined): Promise<any> {
     .select("*")
     .eq("telegram_id", userId)
     .single();
+
+  if (error) {
+    console.error("Error getting mother:", error);
+    return null;
+  }
+
+  return data;
 }
 
 export async function saveMother(

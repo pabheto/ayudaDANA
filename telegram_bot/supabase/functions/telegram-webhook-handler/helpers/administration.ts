@@ -1,6 +1,6 @@
 import { supabase } from "./supabase.ts";
 
-export const ADMINISTRATORS_CHATS_ID = [7591438074];
+export const ADMINISTRATORS_CHATS_ID = [];
 const PAGE_SIZE = 5;
 
 export function isAdministrator(ctx: any) {

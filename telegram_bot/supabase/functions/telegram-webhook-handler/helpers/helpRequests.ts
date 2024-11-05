@@ -1,4 +1,4 @@
-import { getMother } from "./mothers.ts";
+import { getMother, showMainMotherMenu } from "./mothers.ts";
 import { supabase } from "./supabase.ts";
 import telegramBot from "./bot.ts";
 import { getCollaborator } from "./collaborators.ts";
@@ -16,6 +16,7 @@ export async function saveHelpRequest(userId: number | undefined, answers: strin
       nivel_urgencia: nivelUrgencia,
       especialidad: especialidad,
       motivo_consulta: motivoConsulta,
+      estado_solicitud: "PENDIENTE",
     })
     .select("id")
     .single();
@@ -136,6 +137,7 @@ export async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
         inline_keyboard: [
           [{ text: "Confirmar", callback_data: "confirm_help_request" }],
           [{ text: "Rehacer formulario", callback_data: "redo_help_request" }],
+          [{ text: "Cancelar", callback_data: "cancel_help_request" }],
         ],
       },
     });
@@ -245,6 +247,12 @@ export async function handleHelpRequestsButtonsCallbacks(ctx: any) {
     ctx.session.helpRequestQuestionIndex = 0;
     await ctx.reply("Vamos a empezar el formulario de nuevo.");
     await askHelpRequestQuestions(ctx, 0);
+  } else if (ctx.callbackQuery?.data === "cancel_help_request") {
+    await ctx.reply("Solicitud de ayuda cancelada.");
+    ctx.session.helpRequestAnswers = [];
+    ctx.session.helpRequestQuestionIndex = undefined;
+
+    await showMainMotherMenu(ctx);
   }
 
   if (ctx.callbackQuery?.data.startsWith("helpRequest_attend_")) {
@@ -432,6 +440,12 @@ export async function attendHelpRequest(ctx: any, helpRequestId: number) {
     console.warn("Collaborator not found when attending help request", userId);
     return;
   }
+
+  // Registrando en la base de datos que el colaborador ha atendido la solicitud
+  await supabase
+    .from("help_requests")
+    .update({ attended_by_chat_id: userId, attended_at: new Date().toISOString(), estado_solicitud: "ATENDIDA" })
+    .eq("id", helpRequestId);
 
   // Enviar un mensaje al usuario que ha atendido la solicitud
   const messageTemplate = `Hola ${mother.nombre_completo}. Soy ${collaborator?.nombre_completo}, ${collaborator?.profesion},

@@ -133,12 +133,13 @@ export async function handleMotherButtonsCallbacks(ctx: any) {
 
     // Si no hay más preguntas, guardar respuestas y cambiar el rol a madre
     await saveMother(ctx.from?.id, ctx.session.motherAnswers, ctx.from?.username); // Guardar respuestas en la base de datos
-    await ctx.reply("Formulario completado. Ahora puedes solicitar ayuda desde el menu abajo.");
+    await ctx.reply(
+      "Formulario completado. Ahora puedes solicitar ayuda desde el menu abajo. Si necesitas cualquier cosa, puedes pedirmelo con el escribiendo /ayuda o contactando con nosotros!"
+    );
     ctx.session.role = AvailableRoles.MOTHER;
     ctx.session.motherQuestionIndex = undefined;
     ctx.session.motherAnswers = [];
     await showMainMotherMenu(ctx);
-
   }
 
   if (choice === "cancel_mother_registration") {
@@ -150,10 +151,6 @@ export async function handleMotherButtonsCallbacks(ctx: any) {
 }
 
 export async function handleMotherTextCallbacks(ctx: any) {
-  if (ctx.session.motherQuestionIndex != null) {
-    await askMotherFormQuestions(ctx, ctx.session.motherQuestionIndex);
-  }
-
   if (ctx.session?.motherQuestionIndex != undefined) {
     const questionIndex = ctx.session.motherQuestionIndex;
     ctx.session.motherAnswers[questionIndex] = ctx.message.text;
@@ -200,7 +197,9 @@ Teléfono: ${telefono}
 Dirección: ${calleNumeroPiso}
 Pueblo afectado: ${puebloAfectado}
 Código Postal: ${codigoPostal}
-Descripción: ${descripcion}`;
+Descripción: ${descripcion}
+
+¿Son correctos estos datos?`;
     await ctx.reply(summaryMessage, {
       reply_markup: {
         inline_keyboard: [

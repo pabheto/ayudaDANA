@@ -69,8 +69,48 @@ export async function getCollaborator(userId: number | undefined) {
 
 //#region Formularios
 // Callbacks para los botones
+
+// Función para mostrar el menú de datos del colaborador con opciones de edición
+export async function showCollaboratorDataMenu(ctx: any) {
+  const collaborator = await getCollaborator(ctx.from?.id);
+
+  if (!collaborator) {
+    await ctx.reply("No se encontraron tus datos. Asegúrate de estar registrado como colaborador.");
+    return;
+  }
+
+  await ctx.reply("Aquí puedes ver y editar tus datos personales:", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: `Nombre: ${collaborator.nombre_completo}`, callback_data: "edit_nombre_completo" }],
+        [{ text: `Teléfono: ${collaborator.telefono}`, callback_data: "edit_telefono" }],
+        [{ text: `Profesión: ${collaborator.profesion}`, callback_data: "edit_profesion" }],
+        [
+          {
+            text: `Formación y experiencia: ${collaborator.formacion_experiencia}`,
+            callback_data: "edit_formacion_experiencia",
+          },
+        ],
+        [{ text: `Especialidad: ${collaborator.tipo_ayuda}`, callback_data: "edit_tipo_ayuda" }],
+        [
+          {
+            text: `Número de colegiado: ${collaborator.numero_colegiado || "No especificado"}`,
+            callback_data: "edit_numero_colegiado",
+          },
+        ],
+        [{ text: "Volver al Menú Principal", callback_data: "menu_principal" }],
+      ],
+    },
+  });
+}
 export async function handleCollaboratorButtonsCallbacks(ctx: any) {
   const choice = ctx.callbackQuery?.data;
+
+  if (choice === "collaborator_edit_data") {
+    await showCollaboratorDataMenu(ctx); // Muestra el menú de edición de datos
+    return;
+  }
+
   // Gestión de los botones de la especialidad
   if (ctx.session.collaboratorQuestionIndex === 4) {
     console.log("Seleccionado botón de especialidad ", ctx.callbackQuery);
@@ -124,7 +164,7 @@ export async function handleCollaboratorButtonsCallbacks(ctx: any) {
     await saveCollaborator(ctx.from?.id, ctx.session.collaboratorAnswers, ctx.from?.username);
     await ctx.reply("Formulario de colaborador completado. Gracias por ofrecer tu ayuda.");
 
-    // Add telegram user to the group with id -1002266155232
+    // Add telegram user to the group with id -1002266155232c
     try {
       // Use grammy
       const chatLink = await telegramBot.api.createChatInviteLink("-1002266155232", { member_limit: 1 });
@@ -141,9 +181,47 @@ export async function handleCollaboratorButtonsCallbacks(ctx: any) {
     ctx.session.collaboratorQuestionIndex = undefined;
     ctx.session.collaboratorAnswers = [];
   }
+
+  // Mapear los botones de edición a los campos de la base de datos
+  const fieldMapping: { [key: string]: string } = {
+    edit_nombre_completo: "nombre_completo",
+    edit_telefono: "telefono",
+    edit_profesion: "profesion",
+    edit_formacion_experiencia: "formacion_experiencia",
+    edit_tipo_ayuda: "tipo_ayuda",
+    edit_numero_colegiado: "numero_colegiado",
+  };
+
+  if (fieldMapping[choice]) {
+    ctx.session.currentEditingField = fieldMapping[choice];
+    await ctx.reply(`Introduce el nuevo valor para ${fieldMapping[choice].replace("_", " ")}:`);
+  }
 }
 
 export async function handleCollaboratorTextCallbacks(ctx: any) {
+  if (ctx.session.currentEditingField) {
+    const field = ctx.session.currentEditingField;
+    const newValue = ctx.message.text;
+
+    // Actualizar el campo en la base de datos
+    const { error } = await supabase
+      .from("collaborator")
+      .update({ [field]: newValue })
+      .eq("telegram_id", ctx.from?.id);
+
+    if (error) {
+      console.error("Error al actualizar el campo:", error);
+      await ctx.reply("Hubo un error al actualizar el dato. Inténtalo de nuevo.");
+    } else {
+      await ctx.reply(`El campo ${field.replace("_", " ")} ha sido actualizado exitosamente.`);
+    }
+
+    // Limpiar el estado de edición y mostrar el menú de datos actualizado
+    ctx.session.currentEditingField = undefined;
+    await showCollaboratorMenu(ctx);
+    return;
+  }
+
   if (ctx.session.collaboratorQuestionIndex != undefined || ctx.session.collaboratorQuestionIndex != null) {
     const questionIndex = ctx.session.collaboratorQuestionIndex;
 
@@ -306,18 +384,18 @@ Número de colegiado: ${numeroColegiado}
 //#region Menús
 export async function showCollaboratorMenu(ctx: any) {
   // Obteniendo el colaborador actual
-  await ctx.reply("He visto que ya estas dado de alta como profesional");
+  // await ctx.reply("He visto que ya estas dado de alta como profesional");
 
   await ctx.reply("¿Qué deseas hacer?", {
     reply_markup: {
       inline_keyboard: [
         [{ text: "Editar mis datos", callback_data: "collaborator_edit_data" }],
-        [
+        /*[
           {
             text: "Eliminar cuenta",
             callback_data: "collaborator_delete_account",
           },
-        ],
+        ], */
       ],
     },
   });

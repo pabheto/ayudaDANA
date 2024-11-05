@@ -273,7 +273,7 @@ telegramBot.on("message:text", async (ctx) => {
 });
 
 // Comando /ayuda para solicitar asistencia específica
-/* telegramBot.command("ayuda", async (ctx) => {
+telegramBot.command("ayuda", async (ctx) => {
   const userId = ctx.from?.id;
 
   if (ctx.role === AvailableRoles.MOTHER) {
@@ -294,7 +294,7 @@ telegramBot.on("message:text", async (ctx) => {
   }
 
   await ctx.reply("Primero te debes registrar como persona afectada en el sistema usando el comando /start.");
-}); */
+});
 
 /* -------------------------------- Handlers -------------------------------- */
 // Handler para manejar las actualizaciones de Telegram

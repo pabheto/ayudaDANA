@@ -2,6 +2,8 @@ import { getMother, showMainMotherMenu } from "./mothers.ts";
 import { supabase } from "./supabase.ts";
 import telegramBot from "./bot.ts";
 import { getCollaborator } from "./collaborators.ts";
+import { showMotherDataMenu } from "./mothers.ts";
+import { MAIN_PROFESSIONAL_CHAT_ID } from "../index.ts";
 
 //#region Funciones CRUD para solicitudes de ayuda
 export async function saveHelpRequest(userId: number | undefined, answers: string[]): Promise<number | undefined> {
@@ -242,6 +244,8 @@ export async function handleHelpRequestsButtonsCallbacks(ctx: any) {
     await ctx.reply("Solicitud de ayuda confirmada y enviada. Pronto nos pondremos en contacto contigo.");
     ctx.session.helpRequestAnswers = [];
     ctx.session.helpRequestQuestionIndex = undefined;
+
+    await showMotherDataMenu(ctx);
   } else if (ctx.callbackQuery?.data === "redo_help_request") {
     ctx.session.helpRequestAnswers = [];
     ctx.session.helpRequestQuestionIndex = 0;
@@ -352,10 +356,14 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
     return;
   }
 
-  const message = `Nueva solicitud de ayuda de ${mother.nombre_completo} (${mother.telegram_id})
-    - Nivel de urgencia: ${helpRequest.nivel_urgencia}
-    - Especialidad: ${helpRequest.especialidad}
-    - Motivo de consulta: ${helpRequest.motivo_consulta}`;
+  const message =
+    `*Nueva solicitud de ayuda*\n\n` +
+    `*Nombre:* ${mother.nombre_completo}\n` +
+    `*Nivel de urgencia:* ${helpRequest.nivel_urgencia} ${
+      helpRequest.nivel_urgencia === "Alto" ? "🚨" : helpRequest.nivel_urgencia === "Medio" ? "🟠" : "🟢"
+    }\n` +
+    `*Especialidad:* ${helpRequest.especialidad}\n` +
+    `*Motivo de consulta:* ${helpRequest.motivo_consulta}`;
 
   // Obtener la especialidad de la solicitud de ayuda
   const speciality = helpRequest.especialidad;
@@ -432,6 +440,20 @@ export async function attendHelpRequest(ctx: any, helpRequestId: number) {
 
   const collaborator = await getCollaborator(userId);
 
+  if (collaborator.bloqueado) {
+    await ctx.answerCallbackQuery({
+      text: "No puedes atender solicitudes porque estás bloqueado. Por favor, contacta con el bot o contacta con nuestro soporte.",
+      show_alert: true,
+    });
+    console.warn("Collaborator is blocked when attending help request", userId);
+
+    // Eliminando al usuario del grupo
+    await telegramBot.api.banChatMember(MAIN_PROFESSIONAL_CHAT_ID, userId);
+    console.log("Collaborator banned from chat", collaborator.chat_id);
+
+    return;
+  }
+
   if (!collaborator) {
     await ctx.answerCallbackQuery({
       text: "No estás registrado como colaborador. Por favor, contacta con el bot o contacta con nuestro soporte.",
@@ -444,7 +466,12 @@ export async function attendHelpRequest(ctx: any, helpRequestId: number) {
   // Registrando en la base de datos que el colaborador ha atendido la solicitud
   await supabase
     .from("help_requests")
-    .update({ attended_by_chat_id: userId, attended_at: new Date().toISOString(), estado_solicitud: "ATENDIDA" })
+    .update({
+      attended_by_chat_id: userId,
+      attended_at: new Date().toISOString(),
+      atendido_por_nombre: collaborator.nombre_completo,
+      estado_solicitud: "ATENDIDA",
+    })
     .eq("id", helpRequestId);
 
   // Enviar un mensaje al usuario que ha atendido la solicitud
@@ -464,8 +491,8 @@ export async function attendHelpRequest(ctx: any, helpRequestId: number) {
   // Enviar un mensaje al usuario que ha solicitado la ayuda
   await telegramBot.api.sendMessage(
     helpRequest.mother_telegram_id,
-    `Hola ${mother.nombre_completo}. El colaborador ${collaborator?.nombre_completo} te está contactando para atender tu solicitud: "${helpRequest.motivo_consulta}"
-    Puedes ponerte en contacto con él a través de su Telegram si no te ha contactado en los próximos minutos: [${collaborator.nombre_completo}](https://t.me/${collaborator.telegram_username})
+    `Hola ${mother.nombre_completo}. El profesional *${collaborator?.nombre_completo}* te está contactando para atender tu solicitud: "${helpRequest.motivo_consulta}"
+Puedes ponerte en contacto con él a través de su Telegram si no te ha contactado en los próximos minutos: [${collaborator.nombre_completo}](https://t.me/${collaborator.telegram_username})
     `,
     {
       parse_mode: "Markdown",

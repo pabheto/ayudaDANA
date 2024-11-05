@@ -250,6 +250,7 @@ export async function showMainMotherMenu(ctx: any) {
       inline_keyboard: [
         [{ text: "Pedir Ayuda", callback_data: "mother_pedir_ayuda" }],
         [{ text: "Mis Datos", callback_data: "mother_mis_datos" }],
+        [{ text: "Mis Solicitudes", callback_data: "mother_mis_solicitudes" }],
       ],
     },
   });

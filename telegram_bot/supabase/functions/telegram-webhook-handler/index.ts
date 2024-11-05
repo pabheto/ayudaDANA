@@ -41,7 +41,8 @@ export interface SessionData {
   currentEditingField?: string;
 }
 
-export const BLACKLISTED_CHAT_IDS = [-1002266155232];
+export const MAIN_PROFESSIONAL_CHAT_ID = -1002266155232;
+export const BLACKLISTED_CHAT_IDS = [MAIN_PROFESSIONAL_CHAT_ID];
 
 export function isBlacklisted(ctx: any) {
   return BLACKLISTED_CHAT_IDS.includes(ctx.from?.id);

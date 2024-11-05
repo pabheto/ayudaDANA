@@ -6,7 +6,7 @@ import {
   handleCollaboratorTextCallbacks,
   showCollaboratorMenu,
 } from "./helpers/collaborators.ts";
-import { handleHelpRequestsButtonsCallbacks, handleHelpRequestsTextCallbacks } from "./helpers/helpRequests.ts";
+import { askHelpRequestQuestions, handleHelpRequestsButtonsCallbacks, handleHelpRequestsTextCallbacks } from "./helpers/helpRequests.ts";
 import {
   askMotherFormQuestions,
   checkMotherExists,
@@ -282,6 +282,28 @@ telegramBot.command("ayuda", async (ctx) => {
     if (motherExists) {
       await ctx.reply("Por favor responde las siguientes preguntas:");
       await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
+      return;
+    }
+  }
+
+  if (ctx.role === AvailableRoles.COLLABORATOR) {
+    const collaboratorExists = await checkCollaboratorExists(userId);
+    if (collaboratorExists) {
+      await showCollaboratorMenu(ctx);
+      return;
+    }
+  }
+
+  await ctx.reply("Primero te debes registrar como persona afectada en el sistema usando el comando /start.");
+});
+
+telegramBot.command("menu", async (ctx) => {
+  const userId = ctx.from?.id;
+
+  if (ctx.role === AvailableRoles.MOTHER) {
+    const motherExists = await checkMotherExists(userId); // Verificar si la madre ya está registrada
+    if (motherExists) {
+      await showMainMotherMenu(ctx);
       return;
     }
   }

@@ -1,4 +1,5 @@
 import { AvailableRoles, flushSessionForms, showRegistrationMainMenu } from "../index.ts";
+import telegramBot from "./bot.ts";
 import { askHelpRequestQuestions } from "./helpRequests.ts";
 import { supabase } from "./supabase.ts";
 
@@ -154,7 +155,7 @@ export async function handleMotherTextCallbacks(ctx: any) {
   if (ctx.session?.motherQuestionIndex != undefined) {
     const questionIndex = ctx.session.motherQuestionIndex;
     ctx.session.motherAnswers[questionIndex] = ctx.message.text;
-    await askMotherFormQuestions(ctx, questionIndex + 1);
+    return await askMotherFormQuestions(ctx, questionIndex + 1);
   }
 
   if (ctx.session.currentEditingField) {
@@ -176,9 +177,10 @@ export async function handleMotherTextCallbacks(ctx: any) {
 
     // Limpiar el estado de edición y mostrar el menú de datos actualizado
     ctx.session.currentEditingField = undefined;
-    await showMotherDataMenu(ctx);
-    return;
+    return await showMotherDataMenu(ctx);
   }
+
+  return await showMainMotherMenu(ctx);
 }
 
 export async function askMotherFormQuestions(ctx: any, questionIndex: number) {
@@ -246,6 +248,18 @@ Descripción: ${descripcion}
 // Función para mostrar el menú principal con opciones "Pedir Ayuda" y "Mis Datos"
 export async function showMainMotherMenu(ctx: any) {
   await ctx.reply("¿Qué deseas hacer?", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "Pedir Ayuda", callback_data: "mother_pedir_ayuda" }],
+        [{ text: "Mis Datos", callback_data: "mother_mis_datos" }],
+        [{ text: "Mis Solicitudes", callback_data: "mother_mis_solicitudes" }],
+      ],
+    },
+  });
+}
+
+export async function sendMotherMenuToChatId(chatId: number) {
+  await telegramBot.api.sendMessage(chatId, "¿Qué deseas hacer?", {
     reply_markup: {
       inline_keyboard: [
         [{ text: "Pedir Ayuda", callback_data: "mother_pedir_ayuda" }],

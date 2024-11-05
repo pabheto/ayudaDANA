@@ -1,4 +1,4 @@
-import { getMother, showMainMotherMenu } from "./mothers.ts";
+import { getMother, sendMotherMenuToChatId, showMainMotherMenu } from "./mothers.ts";
 import { supabase } from "./supabase.ts";
 import telegramBot from "./bot.ts";
 import { getCollaborator } from "./collaborators.ts";
@@ -515,6 +515,8 @@ Puedes ponerte en contacto con él a través de su Telegram si no te ha contacta
           parse_mode: "Markdown",
         }
       );
+
+      await sendMotherMenuToChatId(helpRequest.mother_telegram_id);
     } catch (messageError) {
       console.error("Error sending messages to collaborator and mother:", messageError);
       await ctx.answerCallbackQuery({

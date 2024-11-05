@@ -1,8 +1,12 @@
 import { getMother } from "./mothers.ts";
 import { supabase } from "./supabase.ts";
+import telegramBot from "./bot.ts";
 
 //#region Funciones CRUD para solicitudes de ayuda
-export async function saveHelpRequest(userId: number | undefined, answers: string[]): Promise<number | undefined> {
+export async function saveHelpRequest(
+  userId: number | undefined,
+  answers: string[],
+): Promise<number | undefined> {
   if (!userId || answers.length < 3) return;
 
   const [nivelUrgencia, especialidad, motivoConsulta] = answers;
@@ -25,7 +29,10 @@ export async function saveHelpRequest(userId: number | undefined, answers: strin
 }
 
 export async function getHelpRequest(helpRequestId: number) {
-  const { data, error } = await supabase.from("help_requests").select("*").eq("id", helpRequestId).single();
+  const { data, error } = await supabase.from("help_requests").select("*").eq(
+    "id",
+    helpRequestId,
+  ).single();
 
   if (error) console.error("Error getting help request:", error);
 
@@ -40,6 +47,26 @@ export const helpRequestQuestions = [
   "Describe brevemente el motivo de tu consulta",
 ];
 
+export enum HelpUrgencyOptions {
+  ALTO = "Alto",
+  MEDIO = "Medio",
+  BAJO = "Bajo",
+}
+
+function createUrgencyKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: HelpUrgencyOptions.ALTO, callback_data: "urgency_alto" },
+          { text: HelpUrgencyOptions.MEDIO, callback_data: "urgency_medio" },
+          { text: HelpUrgencyOptions.BAJO, callback_data: "urgency_bajo" },
+        ],
+      ],
+    },
+  };
+}
+
 export enum HelpSpecialities {
   PSICOLOGIA_PERINATAL = "Psicología perinatal",
   PSICOLOGIA_INFANTIL = "Psicología infantil",
@@ -47,7 +74,8 @@ export enum HelpSpecialities {
   MATRONA_GINECOLOGIA = "Matrona y ginecología",
   ENFERMERIA_PEDIATRICA = "Enfermería pediátrica",
   LOGOPEDIA_NEONATAL = "Logopedia neonatal",
-  FISIOTERAPIA_PEDIATRICA_RESPIRATORIA = "Fisioterapia pediátrica y respiratoria",
+  FISIOTERAPIA_PEDIATRICA_RESPIRATORIA =
+    "Fisioterapia pediátrica y respiratoria",
   FISIOTERAPIA_SUELO_PELVICO = "Fisioterapia de suelo pélvico",
   DOULA = "Doula",
   ASESORIA_LACTANCIA = "Asesoría de lactancia",
@@ -60,27 +88,25 @@ function createSpecialitiesKeyboard() {
   // Inicializar el teclado
   const keyboard = [];
 
-  // Obtener las especialidades del enum HelpSpecialities
+  // Crear dos columnas
   const specialities = Object.values(HelpSpecialities);
 
-  // Recorrer las especialidades y añadirlas al teclado
   for (let i = 0; i < specialities.length; i += 2) {
-    // Crear una fila con dos botones
-    const row = [{ text: specialities[i], callback_data: `specialty_${specialities[i]}` }];
+    const row = [];
 
-    // Por cada fila, añadir un segundo botón si hay más especialidades
-    if (i + 1 < specialities.length) {
-      row.push({
-        text: specialities[i + 1],
-        callback_data: `specialty_${specialities[i + 1]}`,
-      });
+    for (let j = 0; j < 2; j++) {
+      const index = i + j;
+      if (index < specialities.length) {
+        row.push({
+          text: specialities[index],
+          callback_data: `specialty_${specialities[index]}`,
+        });
+      }
     }
 
-    // Añadir la fila al teclado
     keyboard.push(row);
   }
 
-  // Devolver el teclado
   return {
     reply_markup: {
       inline_keyboard: keyboard,
@@ -93,18 +119,25 @@ export async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
     ctx.session.helpRequestQuestionIndex = questionIndex;
     const question = helpRequestQuestions[questionIndex];
 
-    if (questionIndex === 1) {
+    if (questionIndex === 0) {
+      await ctx.reply(question, createUrgencyKeyboard());
+    } else if (questionIndex === 1) {
       // Por cada especialidad, mostrar un botón
       await ctx.reply(question, createSpecialitiesKeyboard());
     } else {
       await ctx.reply(question);
     }
   } else {
-    const helpRequestId = await saveHelpRequest(ctx.from?.id, ctx.session.helpRequestAnswers);
+    const helpRequestId = await saveHelpRequest(
+      ctx.from?.id,
+      ctx.session.helpRequestAnswers,
+    );
     // Enviar la solicitud de ayuda a los chats de streaming
     streamHelpRequest(helpRequestId);
 
-    await ctx.reply("Solicitud de ayuda enviada. Pronto nos pondremos en contacto contigo.");
+    await ctx.reply(
+      "Solicitud de ayuda enviada. Pronto nos pondremos en contacto contigo.",
+    );
     ctx.session.helpRequestAnswers = [];
     ctx.session.helpRequestQuestionIndex = undefined;
   }
@@ -161,7 +194,8 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
     return;
   }
 
-  const message = `Nueva solicitud de ayuda de ${mother.name} (${mother.telegram_id})
+  const message =
+    `Nueva solicitud de ayuda de ${mother.name} (${mother.telegram_id})
     - Nivel de urgencia: ${helpRequest.nivel_urgencia}
     - Especialidad: ${helpRequest.especialidad}
     - Motivo de consulta: ${helpRequest.motivo_consulta}`;

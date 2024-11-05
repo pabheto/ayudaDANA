@@ -122,7 +122,27 @@ export async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
     } else {
       await ctx.reply(question);
     }
-  } else {
+  } else if (questionIndex === helpRequestQuestions.length) {
+    // Enviando una confirmación para que la madre verifique los datos de su solicitud
+    const [nivelUrgencia, especialidad, motivoConsulta] = ctx.session.helpRequestAnswers;
+    const resumen = `Resumen de tu solicitud de ayuda:
+    - Nivel de urgencia: ${nivelUrgencia}
+    - Especialidad: ${especialidad}
+    - Motivo de consulta: ${motivoConsulta}
+    `;
+
+    await ctx.reply(resumen, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "Confirmar", callback_data: "confirm_help_request" }],
+          [{ text: "Rehacer formulario", callback_data: "redo_help_request" }],
+        ],
+      },
+    });
+  }
+
+  /* else {
+    
     console.log("Saving help request", ctx.session.helpRequestAnswers);
     const helpRequestId = await saveHelpRequest(ctx.from?.id, ctx.session.helpRequestAnswers);
     // Enviar la solicitud de ayuda a los chats de streaming
@@ -131,7 +151,7 @@ export async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
     await ctx.reply("Solicitud de ayuda enviada. Pronto nos pondremos en contacto contigo.");
     ctx.session.helpRequestAnswers = [];
     ctx.session.helpRequestQuestionIndex = undefined;
-  }
+  } */
 }
 
 // Callback para manejar las respuestas de las solicitudes de ayuda
@@ -186,9 +206,7 @@ export async function handleHelpRequestsButtonsCallbacks(ctx: any) {
     // await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
 
     return true; // Handled the callback
-  }
-
-  if (ctx.session.helpRequestQuestionIndex === 1) {
+  } else if (ctx.session.helpRequestQuestionIndex === 1) {
     console.log("Seleccionado botón de especialidad ", ctx.callbackQuery);
     if (!ctx.callbackQuery?.data.startsWith("speciality_")) {
       await ctx.reply("Por favor, selecciona una opción ", createSpecialitiesKeyboard());
@@ -214,6 +232,19 @@ export async function handleHelpRequestsButtonsCallbacks(ctx: any) {
     // await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
 
     return true; // Handled the callback
+  }
+
+  if (ctx.callbackQuery?.data === "confirm_help_request") {
+    const helpRequestId = await saveHelpRequest(ctx.from?.id, ctx.session.helpRequestAnswers);
+    await streamHelpRequest(helpRequestId);
+    await ctx.reply("Solicitud de ayuda confirmada y enviada. Pronto nos pondremos en contacto contigo.");
+    ctx.session.helpRequestAnswers = [];
+    ctx.session.helpRequestQuestionIndex = undefined;
+  } else if (ctx.callbackQuery?.data === "redo_help_request") {
+    ctx.session.helpRequestAnswers = [];
+    ctx.session.helpRequestQuestionIndex = 0;
+    await ctx.reply("Vamos a empezar el formulario de nuevo.");
+    await askHelpRequestQuestions(ctx, 0);
   }
 
   if (ctx.callbackQuery?.data.startsWith("helpRequest_attend_")) {
@@ -322,13 +353,13 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
   const speciality = helpRequest.especialidad;
 
   // Enviar el mensaje a los chats de streaming de la especialidad
-  let targetThreads = STREAM_HELP_REQUEST_THREAD_IDS_MAP[speciality as HelpSpecialities];
+  const targetThreads = STREAM_HELP_REQUEST_THREAD_IDS_MAP[speciality as HelpSpecialities];
 
   if (!targetThreads) {
-    targetThreads = STREAM_HELP_REQUEST_THREAD_IDS_MAP[HelpSpecialities.OTROS];
+    // targetThreads = STREAM_HELP_REQUEST_THREAD_IDS_MAP[HelpSpecialities.OTROS];
   }
 
-  let messageIds: {
+  const messageIds: {
     chatId: number;
     messageId: number;
     threadId: string;
@@ -393,6 +424,15 @@ export async function attendHelpRequest(ctx: any, helpRequestId: number) {
 
   const collaborator = await getCollaborator(userId);
 
+  if (!collaborator) {
+    await ctx.answerCallbackQuery({
+      text: "No estás registrado como colaborador. Por favor, contacta con el bot o contacta con nuestro soporte.",
+      show_alert: true,
+    });
+    console.warn("Collaborator not found when attending help request", userId);
+    return;
+  }
+
   // Enviar un mensaje al usuario que ha atendido la solicitud
   const messageTemplate = `Hola ${mother.nombre_completo}. Soy ${collaborator?.nombre_completo}, ${collaborator?.profesion},
   Estoy aquí para atender tu solicitud: "${helpRequest.motivo_consulta}"`;
@@ -410,7 +450,12 @@ export async function attendHelpRequest(ctx: any, helpRequestId: number) {
   // Enviar un mensaje al usuario que ha solicitado la ayuda
   await telegramBot.api.sendMessage(
     helpRequest.mother_telegram_id,
-    `Hola ${mother.nombre_completo}. El colaborador ${collaborator?.nombre_completo} te está contactando para atender tu solicitud: "${helpRequest.motivo_consulta}"`
+    `Hola ${mother.nombre_completo}. El colaborador ${collaborator?.nombre_completo} te está contactando para atender tu solicitud: "${helpRequest.motivo_consulta}"
+    Puedes ponerte en contacto con él a través de su Telegram si no te ha contactado en los próximos minutos: [${collaborator.nombre_completo}](https://t.me/${collaborator.telegram_username})
+    `,
+    {
+      parse_mode: "Markdown",
+    }
   );
 
   // Eliminar los mensajes de streaming

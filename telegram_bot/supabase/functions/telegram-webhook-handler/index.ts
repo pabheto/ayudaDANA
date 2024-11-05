@@ -50,7 +50,6 @@ export async function flushSessionForms(ctx: any) {
   ctx.session.collaboratorAnswers = [];
   ctx.session.helpRequestAnswers = [];
   ctx.session.currentEditingField = undefined;
-  ctx.session.role = undefined;
 }
 
 const initialSessionData: SessionData = {
@@ -60,7 +59,6 @@ const initialSessionData: SessionData = {
   motherAnswers: [],
   collaboratorAnswers: [],
   helpRequestAnswers: [],
-  role: undefined,
 };
 
 const supabaseSessionStorage = {
@@ -175,6 +173,9 @@ telegramBot.on("callback_query:data", async (ctx) => {
   console.debug("Session:", ctx.session);
   console.debug("Callback data:", ctx.callbackQuery?.data);
 
+
+  const choice = ctx.callbackQuery?.data;
+
   // Gestión de administración
   if (isAdministrator(ctx)) {
     await handleAdministrationButtonsCallbacks(ctx);
@@ -183,7 +184,7 @@ telegramBot.on("callback_query:data", async (ctx) => {
   }
 
   // Handlers for mother question callbacks
-  if (ctx.session.role === AvailableRoles.MOTHER || ctx.session.motherQuestionIndex !== undefined) {
+  if (ctx.session.role === AvailableRoles.MOTHER || ctx.session.motherQuestionIndex !== undefined || choice.startsWith("helpRequest_attend_")) {
     console.debug("Handling mother question callbacks");
     await handleHelpRequestsButtonsCallbacks(ctx);
     await handleMotherButtonsCallbacks(ctx);
@@ -192,15 +193,14 @@ telegramBot.on("callback_query:data", async (ctx) => {
   }
 
   // Handlers for collaborator question callbacks
-  if (ctx.session.role === AvailableRoles.COLLABORATOR || ctx.session.collaboratorQuestionIndex !== undefined) {
+  if (ctx.session.role === AvailableRoles.COLLABORATOR || ctx.session.collaboratorQuestionIndex !== undefined ) {
     console.debug("Handling collaborator question callbacks");
     await handleCollaboratorButtonsCallbacks(ctx);
 
     return;
   }
 
-  // Callbacks for main menu buttons
-  const choice = ctx.callbackQuery?.data;
+  
 
   if (choice === "role_madre") {
     console.debug("New user selected role madre");

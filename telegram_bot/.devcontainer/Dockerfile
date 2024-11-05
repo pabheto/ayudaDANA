@@ -1,7 +1,6 @@
-# Dockerfile
+#.devcontainer/Dockerfile
+FROM mcr.microsoft.com/devcontainers/typescript-node:20
 
-# Get the node 20 alpine image
-FROM node:20-bullseye AS build
-
-# Install git
-RUN apt update && apt install -y git
+ENV DENO_INSTALL=/home/node/.deno
+RUN curl -fsSL https://deno.land/install.sh | sh \
+  && chown -R node:node /home/node/.deno

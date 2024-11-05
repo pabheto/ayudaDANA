@@ -2,7 +2,6 @@ import { getMother, showMainMotherMenu } from "./mothers.ts";
 import { supabase } from "./supabase.ts";
 import telegramBot from "./bot.ts";
 import { getCollaborator } from "./collaborators.ts";
-import { showMotherDataMenu } from "./mothers.ts";
 import { MAIN_PROFESSIONAL_CHAT_ID } from "../index.ts";
 
 //#region Funciones CRUD para solicitudes de ayuda
@@ -241,11 +240,11 @@ export async function handleHelpRequestsButtonsCallbacks(ctx: any) {
   if (ctx.callbackQuery?.data === "confirm_help_request") {
     const helpRequestId = await saveHelpRequest(ctx.from?.id, ctx.session.helpRequestAnswers);
     await streamHelpRequest(helpRequestId);
-    await ctx.reply("Solicitud de ayuda confirmada y enviada. Pronto nos pondremos en contacto contigo.");
+    await ctx.reply("Solicitud de ayuda confirmada y enviada. Pronto un profesional se pondrá en contacto contigo.");
     ctx.session.helpRequestAnswers = [];
     ctx.session.helpRequestQuestionIndex = undefined;
 
-    await showMotherDataMenu(ctx);
+    await showMainMotherMenu(ctx);
   } else if (ctx.callbackQuery?.data === "redo_help_request") {
     ctx.session.helpRequestAnswers = [];
     ctx.session.helpRequestQuestionIndex = 0;
@@ -384,6 +383,7 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
     console.log("Sending message to thread", threadInfo.chatId, threadInfo.threadId);
     const messageResponse = await telegramBot.api.sendMessage(threadInfo.chatId, message, {
       message_thread_id: threadInfo.threadId,
+      parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [[{ text: "Atender Solicitud", callback_data: `helpRequest_attend_${helpRequestId}` }]],
       },
@@ -413,105 +413,141 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
 }
 
 export async function attendHelpRequest(ctx: any, helpRequestId: number) {
-  const helpRequest = await getHelpRequest(helpRequestId);
+  try {
+    const helpRequest = await getHelpRequest(helpRequestId);
 
-  if (!helpRequest) {
-    console.error("Help request not found");
-    return;
-  }
-
-  // Enviar un mensaje de confirmación al usuario
-  // await telegramBot.api.sendMessage(helpRequest.mother_telegram_id, "Tu solicitud de ayuda ha sido atendida. Pronto nos pondremos en contacto contigo.");
-
-  // Conseguir el usuario que ha pulsado el botón
-  const userId = ctx.from?.id;
-
-  if (!userId) {
-    console.error("User ID not found when attending help request");
-    return;
-  }
-
-  const mother = await getMother(helpRequest.mother_telegram_id);
-
-  if (!mother) {
-    console.error("Mother not found when attending help request", helpRequest.mother_telegram_id);
-    return;
-  }
-
-  const collaborator = await getCollaborator(userId);
-
-  if (collaborator.bloqueado) {
-    await ctx.answerCallbackQuery({
-      text: "No puedes atender solicitudes porque estás bloqueado. Por favor, contacta con el bot o contacta con nuestro soporte.",
-      show_alert: true,
-    });
-    console.warn("Collaborator is blocked when attending help request", userId);
-
-    // Eliminando al usuario del grupo
-    await telegramBot.api.banChatMember(MAIN_PROFESSIONAL_CHAT_ID, userId);
-    console.log("Collaborator banned from chat", collaborator.chat_id);
-
-    return;
-  }
-
-  if (!collaborator) {
-    await ctx.answerCallbackQuery({
-      text: "No estás registrado como colaborador. Por favor, contacta con el bot o contacta con nuestro soporte.",
-      show_alert: true,
-    });
-    console.warn("Collaborator not found when attending help request", userId);
-    return;
-  }
-
-  // Registrando en la base de datos que el colaborador ha atendido la solicitud
-  await supabase
-    .from("help_requests")
-    .update({
-      attended_by_chat_id: userId,
-      attended_at: new Date().toISOString(),
-      atendido_por_nombre: collaborator.nombre_completo,
-      estado_solicitud: "ATENDIDA",
-    })
-    .eq("id", helpRequestId);
-
-  // Enviar un mensaje al usuario que ha atendido la solicitud
-  const messageTemplate = `Hola ${mother.nombre_completo}. Soy ${collaborator?.nombre_completo}, ${collaborator?.profesion},
-  Estoy aquí para atender tu solicitud: "${helpRequest.motivo_consulta}"`;
-
-  const encodedMessage = encodeURIComponent(messageTemplate);
-
-  await telegramBot.api.sendMessage(
-    userId,
-    `Gracias por atender la solicitud de ayuda de ${mother.nombre_completo}.\n\nPor favor, contacta con ella a través de su Telegram: [${mother.nombre_completo}](https://t.me/${mother.telegram_username}?text=${encodedMessage})`,
-    {
-      parse_mode: "Markdown",
+    if (!helpRequest) {
+      console.error("Help request not found");
+      await ctx.answerCallbackQuery();
+      return;
     }
-  );
 
-  // Enviar un mensaje al usuario que ha solicitado la ayuda
-  await telegramBot.api.sendMessage(
-    helpRequest.mother_telegram_id,
-    `Hola ${mother.nombre_completo}. El profesional *${collaborator?.nombre_completo}* te está contactando para atender tu solicitud: "${helpRequest.motivo_consulta}"
+    const userId = ctx.from?.id;
+
+    if (!userId) {
+      console.error("User ID not found when attending help request");
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    const mother = await getMother(helpRequest.mother_telegram_id);
+
+    if (!mother) {
+      console.error("Mother not found when attending help request", helpRequest.mother_telegram_id);
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    const collaborator = await getCollaborator(userId);
+
+    if (!collaborator) {
+      await ctx.answerCallbackQuery({
+        text: "No estás registrado como colaborador. Por favor, contacta con el bot o con nuestro soporte.",
+        show_alert: true,
+      });
+      console.warn("Collaborator not found when attending help request", userId);
+      return;
+    }
+
+    if (collaborator?.bloqueado) {
+      await ctx.answerCallbackQuery({
+        text: "No puedes atender solicitudes porque estás bloqueado. Por favor, contacta con el bot o con nuestro soporte.",
+        show_alert: true,
+      });
+      console.warn("Collaborator is blocked when attending help request", userId);
+
+      try {
+        // Eliminando al usuario del grupo
+        await telegramBot.api.banChatMember(MAIN_PROFESSIONAL_CHAT_ID, userId);
+        console.log("Collaborator banned from chat", collaborator.chat_id);
+      } catch (banError) {
+        console.error("Error banning collaborator from chat:", banError);
+      }
+      return;
+    }
+
+    // Intento de actualizar la solicitud en la base de datos
+    try {
+      console.log("Modificando solicitud de ayuda", helpRequest.id);
+      await supabase
+        .from("help_requests")
+        .update({
+          attended_by_chat_id: collaborator.chat_id,
+          attended_at: new Date().toISOString(),
+          atendido_por_nombre: collaborator.nombre_completo,
+          estado_solicitud: "ATENDIDA",
+        })
+        .eq("id", helpRequest.id);
+    } catch (dbError) {
+      console.error("Error updating help request in database:", dbError);
+      await ctx.answerCallbackQuery({
+        text: "Hubo un problema al registrar la solicitud. Inténtalo de nuevo.",
+        show_alert: true,
+      });
+      return;
+    }
+
+    // Enviar mensajes de notificación
+    try {
+      const messageTemplate = `Hola ${mother.nombre_completo}. Soy ${collaborator?.nombre_completo}, ${collaborator?.profesion},
+      Estoy aquí para atender tu solicitud: "${helpRequest.motivo_consulta}"`;
+      const encodedMessage = encodeURIComponent(messageTemplate);
+
+      await telegramBot.api.sendMessage(
+        userId,
+        `Gracias por atender la solicitud de ayuda de ${mother.nombre_completo}.
+
+Enviada en: ${helpRequest.created_at}
+Solicitud: ${helpRequest.motivo_consulta}
+
+Por favor, contacta con ella a través de su Telegram: [${mother.nombre_completo}](https://t.me/${mother.telegram_username}?text=${encodedMessage})`,
+        {
+          parse_mode: "Markdown",
+        }
+      );
+
+      await telegramBot.api.sendMessage(
+        helpRequest.mother_telegram_id,
+        `Hola ${mother.nombre_completo}. El profesional *${collaborator?.nombre_completo}* te está contactando para atender tu solicitud: "${helpRequest.motivo_consulta}"
 Puedes ponerte en contacto con él a través de su Telegram si no te ha contactado en los próximos minutos: [${collaborator.nombre_completo}](https://t.me/${collaborator.telegram_username})
-    `,
-    {
-      parse_mode: "Markdown",
+        `,
+        {
+          parse_mode: "Markdown",
+        }
+      );
+    } catch (messageError) {
+      console.error("Error sending messages to collaborator and mother:", messageError);
+      await ctx.answerCallbackQuery({
+        text: "Hubo un problema al enviar mensajes. Revisa tus mensajes de Telegram.",
+        show_alert: true,
+      });
+      return;
     }
-  );
 
-  // Eliminar los mensajes de streaming
-  console.log("Removing streaming messages", helpRequest.streaming_message_ids);
-  const messagesToRemove = JSON.parse(helpRequest.streaming_message_ids).messages;
-  console.log("Messages to remove", messagesToRemove);
+    // Intento de eliminar mensajes de streaming
+    try {
+      console.log("Removing streaming messages", helpRequest.streaming_message_ids);
+      const messagesToRemove = JSON.parse(helpRequest.streaming_message_ids).messages;
 
-  await ctx.answerCallbackQuery({
-    text: "Gracias por atender esta solicitud, por favor, revisa tus mensajes privados y ponte en contacto con la persona que te ha solicitado el bot.",
-    show_alert: true,
-  });
+      for (const message of messagesToRemove) {
+        const { chatId, messageId } = message;
+        await telegramBot.api.deleteMessage(chatId, messageId);
+      }
+    } catch (deleteError) {
+      console.error("Error deleting streaming messages:", deleteError);
+    }
 
-  for (const message of messagesToRemove) {
-    const { chatId, messageId, threadId } = message;
-    await telegramBot.api.deleteMessage(chatId, messageId);
+    // Mensaje de confirmación al usuario que atendió la solicitud
+    await ctx.answerCallbackQuery({
+      text: "Gracias por atender esta solicitud, por favor, revisa tus mensajes privados y ponte en contacto con la persona que te ha solicitado el bot.",
+      show_alert: true,
+    });
+  } catch (error) {
+    console.error("Unexpected error in attendHelpRequest:", error);
+    ctx.answerCallbackQuery({
+      text: "Hubo un error inesperado. Por favor, inténtalo de nuevo.",
+      show_alert: true,
+    });
   }
 }
 

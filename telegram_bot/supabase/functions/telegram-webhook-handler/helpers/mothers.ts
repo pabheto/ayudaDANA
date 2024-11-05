@@ -282,8 +282,65 @@ export async function showMotherDataMenu(ctx: any) {
 }
 
 export async function showMotherHelpRequestsMenu(ctx: any) {
-  await ctx.reply("Aquí puedes ver y modificar tus solicitudes de ayuda. (TODO)");
+  const userId = ctx.from?.id;
 
-  // TODO: Añadir opciones para ver y modificar solicitudes de ayuda
+  if (!userId) {
+    await ctx.reply("No se pudo obtener tu identificación. Inténtalo de nuevo.");
+    return;
+  }
+
+  // Consulta las solicitudes de ayuda hechas por esta madre
+  const { data: requests, error } = await supabase
+    .from("help_requests")
+    .select(
+      `
+      id, 
+      created_at,
+      nivel_urgencia, 
+      motivo_consulta, 
+      especialidad, 
+      estado_solicitud, 
+      attended_by_chat_id, 
+      attended_at,
+      collaborator:attended_by_chat_id (nombre_completo, profesion, telegram_username)
+    `
+    )
+    .eq("mother_telegram_id", userId); // Filtra por el ID de la madre
+
+  if (error) {
+    console.error("Error fetching help requests:", error);
+    await ctx.reply("Hubo un error al obtener tus solicitudes de ayuda. Inténtalo más tarde.");
+    return;
+  }
+
+  if (!requests || requests.length === 0) {
+    await ctx.reply("No has hecho ninguna solicitud de ayuda.");
+    return;
+  }
+
+  // Muestra cada solicitud de ayuda
+  for (const request of requests) {
+    const attendedBy = request.collaborator
+      ? `Atendida por: ${request.collaborator[0]?.nombre_completo} (https://t.me/${request.collaborator[0]?.telegram_username})`
+      : null;
+    const attendedAt = request.attended_at
+      ? `Fecha de atención: ${new Date(request.attended_at).toLocaleString()}`
+      : null;
+
+    const requestMessage = `
+Solicitud #${request.id} (${new Date(request.created_at).toLocaleString()})
+- Nivel de urgencia: ${request.nivel_urgencia}
+- Especialidad: ${request.especialidad}
+- Motivo de consulta: ${request.motivo_consulta}
+${attendedBy ? `- Atendida por: ${attendedBy}\n` : "Sin Atender"}
+${attendedAt ? `- Fecha de atención: ${attendedAt}\n` : ""}
+    `;
+
+    await ctx.reply(requestMessage, {
+      reply_markup: {
+        inline_keyboard: [[{ text: "Ver Detalles", callback_data: `view_request_${request.id}` }]],
+      },
+    });
+  }
 }
 //#endregion

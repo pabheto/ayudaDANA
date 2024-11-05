@@ -1,0 +1,80 @@
+// devcontainer.json
+{
+    "name": "Ayuda Dana Telegram Bot",
+    "shutdownAction": "stopContainer", // Container behavior on VSCode close: none, stopContainer (default for image or Dockerfile), and stopCompose (default for Docker Compose)
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    // Extensions and settings
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "esbenp.prettier-vscode", // Prettier
+                "mhutchie.git-graph", // Git Graph
+                "GitHub.copilot", // GitHub Copilot
+                "stackbreak.comment-divider", // Comment Divider
+                "stuart.unique-window-colors", // Unique Window Colors
+                "dbaeumer.vscode-eslint" // ESLint
+            ],
+            "settings": {
+                "eslint.validate": [
+                    "javascript",
+                    "javascriptreact",
+                    "astro",
+                    "typescript",
+                    "typescriptreact"
+                ],
+                // Prettier settings
+                "prettier.enable": true,
+                "editor.formatOnSave": true, // Format files on save
+                "prettier.documentSelectors": [
+                    "**/*.astro"
+                ],
+                "editor.defaultFormatter": "esbenp.prettier-vscode",
+                "[typescript]": {
+                    // TypeScript settings
+                    "editor.defaultFormatter": "esbenp.prettier-vscode"
+                },
+                "[typescriptreact]": {
+                    // TypeScript React settings
+                    "editor.defaultFormatter": "esbenp.prettier-vscode"
+                },
+                "[json]": {
+                    // JSON settings
+                    "editor.defaultFormatter": "esbenp.prettier-vscode",
+                    "editor.quickSuggestions": {
+                        "strings": true
+                    },
+                    "editor.suggest.insertMode": "replace"
+                },
+                "[astro]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode"
+                },
+                "prettier.semi": true,
+                "prettier.trailingComma": "none",
+                "prettier.singleQuote": false,
+                "prettier.printWidth": 80,
+                // Window colors
+                "workbench.colorCustomizations": {
+                    "activityBar.background": "#298dff",
+                    "titleBar.activeBackground": "#298dff",
+                    "titleBar.activeForeground": "#FBFBF6"
+                },
+                // Prevent json schema warnings
+                "json.schemas": [
+                    {
+                        "fileMatch": [
+                            "/package.json"
+                        ],
+                        "url": "https://json.schemastore.org/package",
+                        "schema": true
+                    }
+                ]
+            }
+        }
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
+    ]
+}

@@ -1,17 +1,10 @@
-import {
-  Bot,
-  session,
-  webhookCallback,
-} from "https://deno.land/x/grammy@v1.8.3/mod.ts";
+import { session, webhookCallback } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
 import {
   askCollaboratorFormQuestions,
   checkCollaboratorExists,
   showCollaboratorMenu,
 } from "./helpers/collaborators.ts";
-import {
-  askHelpRequestQuestions,
-  setupSpecialityHandler,
-} from "./helpers/helpRequests.ts";
+import { askHelpRequestQuestions } from "./helpers/helpRequests.ts";
 import {
   askMotherFormQuestions,
   checkMotherExists,
@@ -20,8 +13,7 @@ import {
   showMotherHelpRequestsMenu,
 } from "./helpers/mothers.ts";
 import { supabase } from "./helpers/supabase.ts";
-
-const bot = new Bot(Deno.env.get("TELEGRAM_BOT_TOKEN") || "");
+import telegramBot from "./helpers/bot.ts";
 
 export enum AvailableRoles {
   MOTHER,
@@ -60,11 +52,7 @@ const initialSessionData: SessionData = {
 
 const supabaseSessionStorage = {
   async read(key: string): Promise<SessionData | undefined> {
-    const { data, error } = await supabase
-      .from("telegram_grammy_sessions")
-      .select("*")
-      .eq("session_id", key)
-      .single();
+    const { data, error } = await supabase.from("telegram_grammy_sessions").select("*").eq("session_id", key).single();
 
     if (error) {
       console.error("Error reading session from database:", error);
@@ -83,7 +71,7 @@ const supabaseSessionStorage = {
         },
         {
           onConflict: "session_id",
-        },
+        }
       );
 
       if (error) {
@@ -95,10 +83,7 @@ const supabaseSessionStorage = {
   },
 
   async delete(key: string): Promise<void> {
-    const { error } = await supabase
-      .from("telegram_grammy_sessions")
-      .delete()
-      .eq("session_id", key);
+    const { error } = await supabase.from("telegram_grammy_sessions").delete().eq("session_id", key);
 
     if (error) {
       console.error("Error deleting session from database:", error);
@@ -107,15 +92,15 @@ const supabaseSessionStorage = {
 };
 
 // Middleware para usar el almacenamiento de sesión en Supabase
-bot.use(
+telegramBot.use(
   session({
     initial: (): SessionData => initialSessionData,
     storage: supabaseSessionStorage,
-  }),
+  })
 );
 
 // Comando /start para iniciar el flujo de selección
-bot.command("start", async (ctx) => {
+telegramBot.command("start", async (ctx) => {
   if (ctx.session.role === AvailableRoles.MOTHER) {
     const motherExists = await checkMotherExists(ctx.from?.id);
     if (motherExists) {
@@ -134,21 +119,17 @@ bot.command("start", async (ctx) => {
 });
 
 // Manejo de las respuestas a botones
-bot.on("callback_query:data", async (ctx) => {
+telegramBot.on("callback_query:data", async (ctx) => {
   const choice = ctx.callbackQuery?.data;
 
   if (choice === "role_madre") {
-    await ctx.reply(
-      "Gracias. Vamos a completar el formulario inicial para crear la conexión madre-profesional.",
-    );
+    await ctx.reply("Gracias. Vamos a completar el formulario inicial para crear la conexión madre-profesional.");
     await flushSessionForms(ctx); // Resetear los formularios en la sesión
     await askMotherFormQuestions(ctx, 0); // Inicia las preguntas para madre
   }
 
   if (choice === "role_colaborador") {
-    await ctx.reply(
-      "Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional.",
-    );
+    await ctx.reply("Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional.");
     await flushSessionForms(ctx);
     await askCollaboratorFormQuestions(ctx, 0); // Inicia las preguntas para colaborador
   }
@@ -168,7 +149,7 @@ bot.on("callback_query:data", async (ctx) => {
 });
 
 // Respuesta a mensajes de texto (principalmente para responder formularios)
-bot.on("message:text", async (ctx) => {
+telegramBot.on("message:text", async (ctx) => {
   // Primero, comprobar si se está rellenando algún formulario
   if (ctx.session?.motherQuestionIndex != undefined) {
     const questionIndex = ctx.session.motherQuestionIndex;
@@ -188,7 +169,7 @@ bot.on("message:text", async (ctx) => {
 });
 
 // Comando /ayuda para solicitar asistencia específica
-bot.command("ayuda", async (ctx) => {
+telegramBot.command("ayuda", async (ctx) => {
   const userId = ctx.from?.id;
 
   if (ctx.role === AvailableRoles.MOTHER) {
@@ -208,14 +189,12 @@ bot.command("ayuda", async (ctx) => {
     }
   }
 
-  await ctx.reply(
-    "Primero te debes registrar como persona afectada en el sistema usando el comando /start.",
-  );
+  await ctx.reply("Primero te debes registrar como persona afectada en el sistema usando el comando /start.");
 });
 
 /* -------------------------------- Handlers -------------------------------- */
 // Handler para manejar las actualizaciones de Telegram
-const handleUpdate = webhookCallback(bot, "std/http");
+const handleUpdate = webhookCallback(telegramBot, "std/http");
 
 Deno.serve(async (req) => {
   try {

@@ -1,9 +1,7 @@
 import { getMother } from "./mothers.ts";
 import { supabase } from "./supabase.ts";
 
-import { Bot } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
-
-let bot: Bot;
+import telegramBot from "./bot.ts";
 
 //#region Funciones CRUD para solicitudes de ayuda
 export async function saveHelpRequest(userId: number | undefined, answers: string[]): Promise<number | undefined> {
@@ -162,7 +160,7 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
   for (const chatId of STREAM_HELP_REQUEST_CHAT_IDS) {
     // Enviando mensajes con grammy
     console.log("Sending message to chat id ", chatId);
-    await bot.api.sendMessage(chatId, message);
+    await telegramBot.api.sendMessage(chatId, message);
   }
 }
 

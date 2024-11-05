@@ -36,6 +36,7 @@ export interface SessionData {
 }
 
 async function flushSessionForms(ctx: any) {
+  // Function para resetear todos los states de los formularios en la sesión
   ctx.session.motherQuestionIndex = undefined;
   ctx.session.collaboratorQuestionIndex = undefined;
   ctx.session.helpRequestQuestionIndex = undefined;
@@ -79,7 +80,7 @@ const supabaseSessionStorage = {
         },
         {
           onConflict: "session_id",
-        }
+        },
       );
 
       if (error) {
@@ -107,7 +108,7 @@ bot.use(
   session({
     initial: (): SessionData => initialSessionData,
     storage: supabaseSessionStorage,
-  })
+  }),
 );
 
 // Comando /start para iniciar el flujo de selección
@@ -135,22 +136,22 @@ bot.on("callback_query:data", async (ctx) => {
 
   if (choice === "role_madre") {
     await ctx.reply(
-      "Gracias por tu interés. Vamos a completar el formulario inicial."
+      "Gracias por tu interés. Vamos a completar el formulario inicial.",
     );
-    await flushSessionForms(ctx);
+    await flushSessionForms(ctx); // Resetear los formularios en la sesión
     await askMotherFormQuestions(ctx, 0); // Inicia las preguntas para madre
   }
 
   if (choice === "role_colaborador") {
     await ctx.reply(
-      "Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional."
+      "Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional.",
     );
     await flushSessionForms(ctx);
     await askCollaboratorFormQuestions(ctx, 0); // Inicia las preguntas para colaborador
   }
 
   if (choice === "mother_pedir_ayuda") {
-    await flushSessionForms(ctx);
+    await flushSessionForms(ctx); // Resetear los formularios en la sesión
     await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
   }
 
@@ -205,7 +206,7 @@ bot.command("ayuda", async (ctx) => {
   }
 
   await ctx.reply(
-    "Primero te debes registrar como persona afectada en el sistema usando el comando /start."
+    "Primero te debes registrar como persona afectada en el sistema usando el comando /start.",
   );
 });
 

@@ -5,6 +5,7 @@ import {
 } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
 import {
   askCollaboratorFormQuestions,
+  checkCollaboratorExists,
   showCollaboratorMenu,
 } from "./helpers/collaborators.ts";
 import { askHelpRequestQuestions } from "./helpers/helpRequests.ts";
@@ -32,6 +33,15 @@ export interface SessionData {
   collaboratorAnswers?: string[]; // Respuestas acumuladas del formulario de colaboradores
   helpRequestAnswers?: string[]; // Respuestas acumuladas del formulario de solicitud de ayuda
   role?: AvailableRoles; // Rol del usuario
+}
+
+async function flushSessionForms(ctx: any) {
+  ctx.session.motherQuestionIndex = undefined;
+  ctx.session.collaboratorQuestionIndex = undefined;
+  ctx.session.helpRequestQuestionIndex = undefined;
+  ctx.session.motherAnswers = [];
+  ctx.session.collaboratorAnswers = [];
+  ctx.session.helpRequestAnswers = [];
 }
 
 const initialSessionData: SessionData = {
@@ -127,6 +137,7 @@ bot.on("callback_query:data", async (ctx) => {
     await ctx.reply(
       "Gracias por tu interés. Vamos a completar el formulario inicial."
     );
+    await flushSessionForms(ctx);
     await askMotherFormQuestions(ctx, 0); // Inicia las preguntas para madre
   }
 
@@ -134,10 +145,12 @@ bot.on("callback_query:data", async (ctx) => {
     await ctx.reply(
       "Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional."
     );
+    await flushSessionForms(ctx);
     await askCollaboratorFormQuestions(ctx, 0); // Inicia las preguntas para colaborador
   }
 
   if (choice === "mother_pedir_ayuda") {
+    await flushSessionForms(ctx);
     await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
   }
 
@@ -184,8 +197,11 @@ bot.command("ayuda", async (ctx) => {
   }
 
   if (ctx.role === AvailableRoles.COLLABORATOR) {
-    await showCollaboratorMenu(ctx);
-    return;
+    const collaboratorExists = await checkCollaboratorExists(userId);
+    if (collaboratorExists) {
+      await showCollaboratorMenu(ctx);
+      return;
+    }
   }
 
   await ctx.reply(

@@ -172,7 +172,19 @@ export async function askCollaboratorFormQuestions(
 export async function showCollaboratorMenu(ctx: any) {
   // Obteniendo el colaborador actual
   await ctx.reply(
-    "Ya estas dado de alta como profesional, si tienes alguna duda o necesitas ayuda, puedes preguntar en el grupo de colaboradores.",
+    "He visto que ya estas dado de alta como profesional",
   );
+
+  await ctx.reply("¿Qué deseas hacer?", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "Editar mis datos", callback_data: "collaborator_edit_data" }],
+        [{
+          text: "Eliminar cuenta",
+          callback_data: "collaborator_delete_account",
+        }],
+      ],
+    },
+  });
 }
 //#endregion

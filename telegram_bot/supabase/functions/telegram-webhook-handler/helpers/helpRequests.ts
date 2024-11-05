@@ -1,6 +1,7 @@
 import { getMother } from "./mothers.ts";
 import { supabase } from "./supabase.ts";
 import telegramBot from "./bot.ts";
+import { getCollaborator } from "./collaborators.ts";
 
 //#region Funciones CRUD para solicitudes de ayuda
 export async function saveHelpRequest(userId: number | undefined, answers: string[]): Promise<number | undefined> {
@@ -122,6 +123,7 @@ export async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
       await ctx.reply(question);
     }
   } else {
+    console.log("Saving help request", ctx.session.helpRequestAnswers);
     const helpRequestId = await saveHelpRequest(ctx.from?.id, ctx.session.helpRequestAnswers);
     // Enviar la solicitud de ayuda a los chats de streaming
     streamHelpRequest(helpRequestId);
@@ -213,6 +215,11 @@ export async function handleHelpRequestsButtonsCallbacks(ctx: any) {
 
     return true; // Handled the callback
   }
+
+  if (ctx.callbackQuery?.data.startsWith("helpRequest_attend_")) {
+    const helpRequestId = ctx.callbackQuery.data.replace("helpRequest_attend_", "");
+    await attendHelpRequest(ctx, helpRequestId);
+  }
 }
 
 //#endregion
@@ -254,12 +261,6 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
     - Especialidad: ${helpRequest.especialidad}
     - Motivo de consulta: ${helpRequest.motivo_consulta}`;
 
-  const inlineKeyboard = {
-    reply_markup: {
-      inline_keyboard: [[{ text: "Atender Solicitud", callback_data: `helpRequest_attend_${helpRequestId}` }]],
-    },
-  };
-
   // Obtener la especialidad de la solicitud de ayuda
   const speciality = helpRequest.especialidad;
 
@@ -270,29 +271,36 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
     targetThreads = STREAM_HELP_REQUEST_THREAD_IDS_MAP[HelpSpecialities.OTROS];
   }
 
-  let messageIds: number[] = [];
+  let messageIds: {
+    chatId: number;
+    messageId: number;
+    threadId: string;
+  }[] = [];
   for (const threadInfo of targetThreads) {
-    const messageResponse = await telegramBot.api.sendMessage(
-      threadInfo.chatId,
-      message,
-      {
-        message_thread_id: threadInfo.threadId,
+    console.log("Sending message to thread", threadInfo.chatId, threadInfo.threadId);
+    const messageResponse = await telegramBot.api.sendMessage(threadInfo.chatId, message, {
+      message_thread_id: threadInfo.threadId,
+      reply_markup: {
+        inline_keyboard: [[{ text: "Atender Solicitud", callback_data: `helpRequest_attend_${helpRequestId}` }]],
       },
-      {
-        reply_markup: inlineKeyboard,
-      }
-    );
+    });
     console.log("Message sent to thread", threadInfo.chatId, messageResponse);
     const messageId = messageResponse.message_id;
 
-    messageIds.push(messageId);
+    messageIds.push({
+      chatId: threadInfo.chatId,
+      messageId,
+      threadId: threadInfo.threadId,
+    });
   }
 
   // Guardar los ids de los mensajes en la base de datos
   await supabase
     .from("help_requests")
     .update({
-      streaming_message_ids: messageIds,
+      streaming_message_ids: JSON.stringify({
+        messages: messageIds,
+      }),
     })
     .eq("id", helpRequestId);
 
@@ -300,7 +308,7 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
   return true;
 }
 
-export async function attendHelpRequest(helpRequestId: number) {
+export async function attendHelpRequest(ctx: any, helpRequestId: number) {
   const helpRequest = await getHelpRequest(helpRequestId);
 
   if (!helpRequest) {
@@ -310,6 +318,53 @@ export async function attendHelpRequest(helpRequestId: number) {
 
   // Enviar un mensaje de confirmación al usuario
   // await telegramBot.api.sendMessage(helpRequest.mother_telegram_id, "Tu solicitud de ayuda ha sido atendida. Pronto nos pondremos en contacto contigo.");
+
+  // Conseguir el usuario que ha pulsado el botón
+  const userId = ctx.from?.id;
+
+  if (!userId) {
+    console.error("User ID not found when attending help request");
+    return;
+  }
+
+  const mother = await getMother(helpRequest.mother_telegram_id);
+
+  if (!mother) {
+    console.error("Mother not found when attending help request", helpRequest.mother_telegram_id);
+    return;
+  }
+
+  const collaborator = await getCollaborator(userId);
+
+  // Enviar un mensaje al usuario que ha atendido la solicitud
+  const messageTemplate = `Hola ${mother.nombre_completo}. Soy ${collaborator?.nombre_completo}, ${collaborator?.profesion},
+  Estoy aquí para atender tu solicitud: "${helpRequest.motivo_consulta}"`;
+
+  const encodedMessage = encodeURIComponent(messageTemplate);
+
+  await telegramBot.api.sendMessage(
+    userId,
+    `Gracias por atender la solicitud de ayuda de ${mother.nombre_completo}.\n\nPor favor, contacta con ella a través de su Telegram: [${mother.nombre_completo}](https://t.me/${mother.telegram_username}?text=${encodedMessage})`,
+    {
+      parse_mode: "Markdown",
+    }
+  );
+
+  // Enviar un mensaje al usuario que ha solicitado la ayuda
+  await telegramBot.api.sendMessage(
+    helpRequest.mother_telegram_id,
+    `Hola ${mother.nombre_completo}. El colaborador ${collaborator?.nombre_completo} te está contactando para atender tu solicitud: "${helpRequest.motivo_consulta}"`
+  );
+
+  // Eliminar los mensajes de streaming
+  console.log("Removing streaming messages", helpRequest.streaming_message_ids);
+  const messagesToRemove = JSON.parse(helpRequest.streaming_message_ids).messages;
+  console.log("Messages to remove", messagesToRemove);
+
+  for (const message of messagesToRemove) {
+    const { chatId, messageId, threadId } = message;
+    await telegramBot.api.deleteMessage(chatId, messageId);
+  }
 }
 
 //#endregion

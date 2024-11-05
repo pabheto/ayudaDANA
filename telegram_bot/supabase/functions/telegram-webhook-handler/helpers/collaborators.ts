@@ -4,18 +4,12 @@ import { supabase } from "./supabase.ts";
 //#region Funciones CRUD para colaboradores
 export async function saveCollaborator(
   userId: number | undefined,
-  answers: string[]
+  answers: string[],
+  telegramUsername: string | undefined
 ): Promise<void> {
   if (!userId || answers.length < 5) return;
 
-  const [
-    nombreCompleto,
-    contacto,
-    profesion,
-    formacionExperiencia,
-    tipoAyuda,
-    numeroColegiado = null,
-  ] = answers;
+  const [nombreCompleto, contacto, profesion, formacionExperiencia, tipoAyuda, numeroColegiado = null] = answers;
 
   const { error } = await supabase.from("colaboradores").insert({
     telegram_id: userId,
@@ -25,6 +19,7 @@ export async function saveCollaborator(
     formacion_experiencia: formacionExperiencia,
     tipo_ayuda: tipoAyuda,
     numero_colegiado: numeroColegiado,
+    telegram_username: telegramUsername,
   });
 
   if (error) {
@@ -32,15 +27,9 @@ export async function saveCollaborator(
   }
 }
 
-export async function checkCollaboratorExists(
-  userId: number | undefined
-): Promise<boolean> {
+export async function checkCollaboratorExists(userId: number | undefined): Promise<boolean> {
   if (!userId) return false;
-  const { data, error } = await supabase
-    .from("colaboradores")
-    .select("id")
-    .eq("telegram_id", userId)
-    .single();
+  const { data, error } = await supabase.from("colaboradores").select("id").eq("telegram_id", userId).single();
 
   if (error) {
     console.error("Error checking collaborator:", error);
@@ -49,6 +38,13 @@ export async function checkCollaboratorExists(
 
   return !!data;
 }
+
+export async function getCollaborator(userId: number | undefined): Promise<Collaborator | null> {
+  if (!userId) return null;
+  const { data, error } = await supabase.from("collaborator").select("*").eq("telegram_id", userId).single();
+  return data ?? null;
+}
+
 //#endregion
 
 //#region Formularios
@@ -63,18 +59,13 @@ export const initialCollaboratorFormQuestions = [
 ];
 
 // Función para hacer preguntas del formulario inicial para colaboradores
-export async function askCollaboratorFormQuestions(
-  ctx: any,
-  questionIndex: number
-) {
+export async function askCollaboratorFormQuestions(ctx: any, questionIndex: number) {
   if (questionIndex < initialCollaboratorFormQuestions.length) {
     ctx.session.collaboratorQuestionIndex = questionIndex;
     await ctx.reply(initialCollaboratorFormQuestions[questionIndex]);
   } else {
-    await saveCollaborator(ctx.from?.id, ctx.session.collaboratorAnswers);
-    await ctx.reply(
-      "Formulario de colaborador completado. Gracias por ofrecer tu ayuda."
-    );
+    await saveCollaborator(ctx.from?.id, ctx.session.collaboratorAnswers, ctx.from?.username);
+    await ctx.reply("Formulario de colaborador completado. Gracias por ofrecer tu ayuda.");
     ctx.session.role = AvailableRoles.COLLABORATOR;
     ctx.session.collaboratorQuestionIndex = undefined;
     ctx.session.collaboratorAnswers = [];

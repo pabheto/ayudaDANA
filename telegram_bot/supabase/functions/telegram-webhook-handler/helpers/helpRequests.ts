@@ -114,23 +114,27 @@ export async function askHelpRequestQuestions(ctx: any, questionIndex: number) {
   }
 }
 
-// Funcion para manejar la selección de especialidad
-export function setupSpecialityHandler(bot: any) {
-  bot.action(/specialty_(.+)/, async (ctx: any) => {
-    const specialty = ctx.match[1];
-    ctx.session.helpRequestAnswers[ctx.session.helpRequestQuestionIndex] =
-      specialty;
+// Callback para manejar la selección de especialidad
+export async function handleSpecialityCallback(ctx: any) {
+  if (!ctx.callback_query?.data.startsWith("specialty_")) {
+    return false; // Not a specialty callback
+  }
 
-    // Delete the menu message to keep the chat clean
-    await ctx.deleteMessage();
+  const specialty = ctx.callback_query.data.replace("specialty_", "");
+  ctx.session.helpRequestAnswers[ctx.session.helpRequestQuestionIndex] =
+    specialty;
 
-    // Show selected specialty and move to next question
-    await ctx.reply(`Especialidad seleccionada: ${specialty}`);
-    await askHelpRequestQuestions(
-      ctx,
-      ctx.session.helpRequestQuestionIndex + 1,
-    );
-  });
+  // Answer the callback query to remove loading state
+  await ctx.answerCallbackQuery();
+
+  // Delete the menu message
+  await ctx.deleteMessage(ctx.callback_query.message.message_id);
+
+  // Show selected specialty and move to next question
+  await ctx.reply(`Especialidad seleccionada: ${specialty}`);
+  await askHelpRequestQuestions(ctx, ctx.session.helpRequestQuestionIndex + 1);
+
+  return true; // Handled the callback
 }
 
 //#endregion

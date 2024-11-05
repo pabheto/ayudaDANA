@@ -361,6 +361,11 @@ export async function attendHelpRequest(ctx: any, helpRequestId: number) {
   const messagesToRemove = JSON.parse(helpRequest.streaming_message_ids).messages;
   console.log("Messages to remove", messagesToRemove);
 
+  await ctx.answerCallbackQuery({
+    text: "Gracias por atender esta solicitud, por favor, revisa tus mensajes privados y ponte en contacto con la persona que te ha solicitado el bot.",
+    show_alert: true,
+  });
+
   for (const message of messagesToRemove) {
     const { chatId, messageId, threadId } = message;
     await telegramBot.api.deleteMessage(chatId, messageId);

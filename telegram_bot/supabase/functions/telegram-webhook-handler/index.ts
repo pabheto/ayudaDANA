@@ -1,27 +1,26 @@
 import { session, webhookCallback } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
-import {
-  askCollaboratorFormQuestions,
-  checkCollaboratorExists,
-  showCollaboratorMenu,
-} from "./helpers/collaborators.ts";
-import {
-  askHelpRequestQuestions,
-  handleHelpRequestsTextCallbacks,
-  handleHelpRequestsButtonsCallbacks,
-} from "./helpers/helpRequests.ts";
+import { askCollaboratorFormQuestions, handleCollaboratorButtonsCallbacks, handleCollaboratorTextCallbacks } from "./helpers/collaborators.ts";
+import { handleHelpRequestsTextCallbacks, handleHelpRequestsButtonsCallbacks } from "./helpers/helpRequests.ts";
 import {
   askMotherFormQuestions,
   checkMotherExists,
+  handleMotherButtonsCallbacks,
+  handleMotherTextCallbacks,
   showMainMotherMenu,
-  showMotherDataMenu,
-  showMotherHelpRequestsMenu,
 } from "./helpers/mothers.ts";
 import { supabase } from "./helpers/supabase.ts";
 import telegramBot from "./helpers/bot.ts";
+import {
+  handleAdministrationButtonsCallbacks,
+  handleAdministrationTextCallbacks,
+  isAdministrator,
+  showAdministrationMenu,
+} from "./helpers/administration.ts";
 
 export enum AvailableRoles {
   MOTHER,
   COLLABORATOR,
+  ADMINISTRATOR,
 }
 
 export interface SessionData {
@@ -34,7 +33,7 @@ export interface SessionData {
   role?: AvailableRoles; // Rol del usuario
 }
 
-async function flushSessionForms(ctx: any) {
+export async function flushSessionForms(ctx: any) {
   // Function para resetear todos los states de los formularios en la sesión
   ctx.session.motherQuestionIndex = undefined;
   ctx.session.collaboratorQuestionIndex = undefined;
@@ -105,6 +104,12 @@ telegramBot.use(
 
 // Comando /start para iniciar el flujo de selección
 telegramBot.command("start", async (ctx) => {
+  if (isAdministrator(ctx)) {
+    await showAdministrationMenu(ctx);
+
+    return;
+  }
+
   if (ctx.session.role === AvailableRoles.MOTHER) {
     const motherExists = await checkMotherExists(ctx.from?.id);
     if (motherExists) {
@@ -124,8 +129,26 @@ telegramBot.command("start", async (ctx) => {
 
 // Manejo de las respuestas a botones
 telegramBot.on("callback_query:data", async (ctx) => {
-  await handleHelpRequestsButtonsCallbacks(ctx);
-  
+  // Gestión de administración
+  if (isAdministrator(ctx)) {
+    await handleAdministrationButtonsCallbacks(ctx);
+
+    return;
+  }
+
+  if (ctx.session.role === AvailableRoles.MOTHER || ctx.session.motherQuestionIndex !== undefined) {
+    await handleHelpRequestsButtonsCallbacks(ctx);
+    await handleMotherButtonsCallbacks(ctx);
+
+    return;
+  }
+
+  if (ctx.session.collaboratorQuestionIndex != undefined || ctx.session.role === AvailableRoles.COLLABORATOR) {
+    await handleCollaboratorButtonsCallbacks(ctx);
+
+    return;
+  }
+
   const choice = ctx.callbackQuery?.data;
 
   if (choice === "role_madre") {
@@ -139,42 +162,34 @@ telegramBot.on("callback_query:data", async (ctx) => {
     await flushSessionForms(ctx);
     await askCollaboratorFormQuestions(ctx, 0); // Inicia las preguntas para colaborador
   }
-
-  if (choice === "mother_pedir_ayuda") {
-    await flushSessionForms(ctx); // Resetear los formularios en la sesión
-    await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
-  }
-
-  if (choice === "mother_mis_datos") {
-    await showMotherDataMenu(ctx);
-  }
-
-  if (choice === "mother_mis_solicitudes") {
-    await showMotherHelpRequestsMenu(ctx);
-  }
-
-  // await ctx.answerCallbackQuery();
 });
 
 // Respuesta a mensajes de texto (principalmente para responder formularios)
 telegramBot.on("message:text", async (ctx) => {
-  // Primero, comprobar si se está rellenando algún formulario
-  if (ctx.session?.motherQuestionIndex != undefined) {
-    const questionIndex = ctx.session.motherQuestionIndex;
-    ctx.session.motherAnswers[questionIndex] = ctx.message.text;
-    await askMotherFormQuestions(ctx, questionIndex + 1);
-  }
-  if (ctx.session.collaboratorQuestionIndex != undefined) {
-    const questionIndex = ctx.session.collaboratorQuestionIndex;
-    ctx.session.collaboratorAnswers[questionIndex] = ctx.message.text;
-    await askCollaboratorFormQuestions(ctx, questionIndex + 1);
+  // Gestión de administración
+  if (isAdministrator(ctx)) {
+    await handleAdministrationTextCallbacks(ctx);
+
+    return;
   }
 
-  handleHelpRequestsTextCallbacks(ctx);
+  // Primero, comprobar si se está rellenando algún formulario
+
+  if (ctx.session.collaboratorQuestionIndex != undefined || ctx.session.role === AvailableRoles.COLLABORATOR) {
+    await handleCollaboratorTextCallbacks(ctx);
+  }
+
+  if (ctx.session.motherQuestionIndex != undefined || ctx.session.role === AvailableRoles.MOTHER) {
+    await handleMotherTextCallbacks(ctx);
+  }
+
+  if (ctx.session.role === AvailableRoles.MOTHER) {
+    await handleHelpRequestsTextCallbacks(ctx);
+  }
 });
 
 // Comando /ayuda para solicitar asistencia específica
-telegramBot.command("ayuda", async (ctx) => {
+/* telegramBot.command("ayuda", async (ctx) => {
   const userId = ctx.from?.id;
 
   if (ctx.role === AvailableRoles.MOTHER) {
@@ -195,7 +210,7 @@ telegramBot.command("ayuda", async (ctx) => {
   }
 
   await ctx.reply("Primero te debes registrar como persona afectada en el sistema usando el comando /start.");
-});
+}); */
 
 /* -------------------------------- Handlers -------------------------------- */
 // Handler para manejar las actualizaciones de Telegram

@@ -39,7 +39,7 @@ export async function checkCollaboratorExists(userId: number | undefined): Promi
   return !!data;
 }
 
-export async function getCollaborator(userId: number | undefined): Promise<Collaborator | null> {
+export async function getCollaborator(userId: number | undefined) {
   if (!userId) return null;
   const { data, error } = await supabase.from("collaborator").select("*").eq("telegram_id", userId).single();
   return data ?? null;
@@ -48,10 +48,28 @@ export async function getCollaborator(userId: number | undefined): Promise<Colla
 //#endregion
 
 //#region Formularios
+
+export async function handleCollaboratorButtonsCallbacks(ctx: any) {
+  // TODO: Añadir lógica para manejar los botones
+
+  if (choice === "retry_username" && ctx.session.collaboratorQuestionIndex !== undefined) {
+    await askCollaboratorFormQuestions(ctx, ctx.session.collaboratorQuestionIndex);
+  }
+}
+
+export async function handleCollaboratorTextCallbacks(ctx: any) {
+  // TODO: Añadir lógica para manejar los textos
+  if (ctx.session.collaboratorQuestionIndex != undefined) {
+    const questionIndex = ctx.session.collaboratorQuestionIndex;
+    ctx.session.collaboratorAnswers[questionIndex] = ctx.message.text;
+    await askCollaboratorFormQuestions(ctx, questionIndex + 1);
+  }
+}
+
 // Preguntas iniciales para los colaboradores
 export const initialCollaboratorFormQuestions = [
   "Nombre completo",
-  "Contacto",
+  "Teléfono de contacto",
   "Profesión",
   "Formación y experiencia en el área maternoinfantil",
   "Tipo de ayuda que puedes ofrecer (especialidad)",
@@ -64,6 +82,19 @@ export async function askCollaboratorFormQuestions(ctx: any, questionIndex: numb
     ctx.session.collaboratorQuestionIndex = questionIndex;
     await ctx.reply(initialCollaboratorFormQuestions[questionIndex]);
   } else {
+    const username = ctx.from?.username;
+    if (!username) {
+      await ctx.reply(
+        "No he podido conseguir tu nombre de usuario de Telegram. Por favor, establece un usuario de telegram y vuelve a intentarlo.",
+        {
+          reply_markup: {
+            inline_keyboard: [[{ text: "Reintentar", callback_data: "retry_username" }]],
+          },
+        }
+      );
+      return;
+    }
+
     await saveCollaborator(ctx.from?.id, ctx.session.collaboratorAnswers, ctx.from?.username);
     await ctx.reply("Formulario de colaborador completado. Gracias por ofrecer tu ayuda.");
     ctx.session.role = AvailableRoles.COLLABORATOR;
@@ -75,6 +106,7 @@ export async function askCollaboratorFormQuestions(ctx: any, questionIndex: numb
 
 //#region Menús
 export async function showCollaboratorMenu(ctx: any) {
+  // Obteniendo el colaborador actual
   await ctx.reply("Menú de colaborador (TODO)");
 }
 //#endregion

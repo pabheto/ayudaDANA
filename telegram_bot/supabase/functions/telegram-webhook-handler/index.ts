@@ -4,7 +4,11 @@ import {
   checkCollaboratorExists,
   showCollaboratorMenu,
 } from "./helpers/collaborators.ts";
-import { askHelpRequestQuestions } from "./helpers/helpRequests.ts";
+import {
+  askHelpRequestQuestions,
+  handleHelpRequestsTextCallbacks,
+  handleHelpRequestsButtonsCallbacks,
+} from "./helpers/helpRequests.ts";
 import {
   askMotherFormQuestions,
   checkMotherExists,
@@ -120,6 +124,8 @@ telegramBot.command("start", async (ctx) => {
 
 // Manejo de las respuestas a botones
 telegramBot.on("callback_query:data", async (ctx) => {
+  await handleHelpRequestsButtonsCallbacks(ctx);
+  
   const choice = ctx.callbackQuery?.data;
 
   if (choice === "role_madre") {
@@ -146,6 +152,8 @@ telegramBot.on("callback_query:data", async (ctx) => {
   if (choice === "mother_mis_solicitudes") {
     await showMotherHelpRequestsMenu(ctx);
   }
+
+  // await ctx.answerCallbackQuery();
 });
 
 // Respuesta a mensajes de texto (principalmente para responder formularios)
@@ -161,11 +169,8 @@ telegramBot.on("message:text", async (ctx) => {
     ctx.session.collaboratorAnswers[questionIndex] = ctx.message.text;
     await askCollaboratorFormQuestions(ctx, questionIndex + 1);
   }
-  if (ctx.session.helpRequestQuestionIndex != null) {
-    const questionIndex = ctx.session.helpRequestQuestionIndex;
-    ctx.session.helpRequestAnswers[questionIndex] = ctx.message.text;
-    await askHelpRequestQuestions(ctx, questionIndex + 1);
-  }
+
+  handleHelpRequestsTextCallbacks(ctx);
 });
 
 // Comando /ayuda para solicitar asistencia específica

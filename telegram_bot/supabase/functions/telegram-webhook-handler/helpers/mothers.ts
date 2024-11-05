@@ -193,17 +193,19 @@ export async function askMotherFormQuestions(ctx: any, questionIndex: number) {
     // Enviar un mensaje de confirmación antes de registrar la madre
     const [nombreCompleto, telefono, calleNumeroPiso, puebloAfectado, codigoPostal, descripcion] =
       ctx.session.motherAnswers;
-    const summaryMessage = `Nombre: ${nombreCompleto}
+    const summaryMessage = `Te estás registrando como una madre que solicita ayuda. Aquí tienes un resumen de tus datos:
+    
+Nombre: ${nombreCompleto}
 Teléfono: ${telefono}
 Dirección: ${calleNumeroPiso}
 Pueblo afectado: ${puebloAfectado}
 Código Postal: ${codigoPostal}
 Descripción: ${descripcion}`;
-    await ctx.reply("¿Estás seguro de que quieres registrar estos datos?", {
+    await ctx.reply(summaryMessage, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "Sí", callback_data: "confirm_mother_registration" }],
-          [{ text: "No", callback_data: "cancel_mother_registration" }],
+          [{ text: "Confirm", callback_data: "confirm_mother_registration" }],
+          [{ text: "Corregir", callback_data: "cancel_mother_registration" }],
         ],
       },
     });

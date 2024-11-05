@@ -1,8 +1,6 @@
 import { getMother } from "./mothers.ts";
 import { supabase } from "./supabase.ts";
 
-import telegramBot from "./bot.ts";
-
 //#region Funciones CRUD para solicitudes de ayuda
 export async function saveHelpRequest(userId: number | undefined, answers: string[]): Promise<number | undefined> {
   if (!userId || answers.length < 3) return;
@@ -53,6 +51,7 @@ export enum HelpSpecialities {
   FISIOTERAPIA_SUELO_PELVICO = "Fisioterapia de suelo pélvico",
   DOULA = "Doula",
   ASESORIA_LACTANCIA = "Asesoría de lactancia",
+  OTROS = "Otros",
 }
 
 function createSpecialitiesKeyboard() {
@@ -118,8 +117,7 @@ export async function handleSpecialityCallback(ctx: any) {
   }
 
   const specialty = ctx.callback_query.data.replace("specialty_", "");
-  ctx.session.helpRequestAnswers[ctx.session.helpRequestQuestionIndex] =
-    specialty;
+  ctx.session.helpRequestAnswers[ctx.session.helpRequestQuestionIndex] = specialty;
 
   // Answer the callback query to remove loading state
   await ctx.answerCallbackQuery();
@@ -138,6 +136,14 @@ export async function handleSpecialityCallback(ctx: any) {
 
 //#region Gestión de solicitudes de ayuda en tiempo real
 const STREAM_HELP_REQUEST_CHAT_IDS = [412430132, 9150852, 280023];
+
+const STREAM_HELP_REQUEST_CHAT_IDS_MAP = {
+  [HelpSpecialities.PSICOLOGIA_PERINATAL]: [],
+  [HelpSpecialities.PSICOLOGIA_INFANTIL]: [],
+  [HelpSpecialities.PEDIATRIA]: [],
+  [HelpSpecialities.OTROS]: [-1002266155232_49],
+};
+
 export async function streamHelpRequest(helpRequestId: number | undefined) {
   console.log("Streaming help request", helpRequestId);
   if (!helpRequestId) return;
@@ -160,9 +166,17 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
     - Especialidad: ${helpRequest.especialidad}
     - Motivo de consulta: ${helpRequest.motivo_consulta}`;
 
-  for (const chatId of STREAM_HELP_REQUEST_CHAT_IDS) {
-    // Enviando mensajes con grammy
-    console.log("Sending message to chat id ", chatId);
+  // Obtener la especialidad de la solicitud de ayuda
+  const speciality = helpRequest.especialidad;
+
+  // Enviar el mensaje a los chats de streaming de la especialidad
+  let targetChatIds = STREAM_HELP_REQUEST_CHAT_IDS_MAP[speciality];
+
+  if (!targetChatIds) {
+    targetChatIds = STREAM_HELP_REQUEST_CHAT_IDS_MAP[HelpSpecialities.OTROS];
+  }
+
+  for (const chatId of targetChatIds) {
     await telegramBot.api.sendMessage(chatId, message);
   }
 }

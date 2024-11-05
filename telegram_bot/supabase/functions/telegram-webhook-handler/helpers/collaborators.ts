@@ -5,16 +5,23 @@ import { supabase } from "./supabase.ts";
 export async function saveCollaborator(
   userId: number | undefined,
   answers: string[],
-  telegramUsername: string | undefined
+  telegramUsername: string | undefined,
 ): Promise<void> {
   if (!userId || answers.length < 5) return;
 
-  const [nombreCompleto, contacto, profesion, formacionExperiencia, tipoAyuda, numeroColegiado = null] = answers;
+  const [
+    nombreCompleto,
+    telefono,
+    profesion,
+    formacionExperiencia,
+    tipoAyuda,
+    numeroColegiado = null,
+  ] = answers;
 
   const { error } = await supabase.from("colaboradores").insert({
     telegram_id: userId,
     nombre_completo: nombreCompleto,
-    contacto: contacto,
+    telefono: telefono,
     profesion: profesion,
     formacion_experiencia: formacionExperiencia,
     tipo_ayuda: tipoAyuda,
@@ -27,9 +34,14 @@ export async function saveCollaborator(
   }
 }
 
-export async function checkCollaboratorExists(userId: number | undefined): Promise<boolean> {
+export async function checkCollaboratorExists(
+  userId: number | undefined,
+): Promise<boolean> {
   if (!userId) return false;
-  const { data, error } = await supabase.from("colaboradores").select("id").eq("telegram_id", userId).single();
+  const { data, error } = await supabase.from("colaboradores").select("id").eq(
+    "telegram_id",
+    userId,
+  ).single();
 
   if (error) {
     console.error("Error checking collaborator:", error);
@@ -41,7 +53,10 @@ export async function checkCollaboratorExists(userId: number | undefined): Promi
 
 export async function getCollaborator(userId: number | undefined) {
   if (!userId) return null;
-  const { data, error } = await supabase.from("collaborator").select("*").eq("telegram_id", userId).single();
+  const { data, error } = await supabase.from("collaborator").select("*").eq(
+    "telegram_id",
+    userId,
+  ).single();
   return data ?? null;
 }
 
@@ -52,8 +67,14 @@ export async function getCollaborator(userId: number | undefined) {
 export async function handleCollaboratorButtonsCallbacks(ctx: any) {
   // TODO: Añadir lógica para manejar los botones
 
-  if (choice === "retry_username" && ctx.session.collaboratorQuestionIndex !== undefined) {
-    await askCollaboratorFormQuestions(ctx, ctx.session.collaboratorQuestionIndex);
+  if (
+    choice === "retry_username" &&
+    ctx.session.collaboratorQuestionIndex !== undefined
+  ) {
+    await askCollaboratorFormQuestions(
+      ctx,
+      ctx.session.collaboratorQuestionIndex,
+    );
   }
 }
 
@@ -68,16 +89,19 @@ export async function handleCollaboratorTextCallbacks(ctx: any) {
 
 // Preguntas iniciales para los colaboradores
 export const initialCollaboratorFormQuestions = [
-  "Nombre completo",
-  "Teléfono de contacto",
-  "Profesión",
-  "Formación y experiencia en el área maternoinfantil",
-  "Tipo de ayuda que puedes ofrecer (especialidad)",
-  "Número de colegiado (opcional)",
+  "Escribe tu nombre completo",
+  "Escribe tu teléfono de contacto",
+  "¿Cuál es tu profesión?",
+  "¿Cuál es tu formación y experiencia en el área maternoinfantil?",
+  "Escribe el tipo de ayuda que puedes ofrecer (especialidad)",
+  "Escribe tu número de colegiado (opcional)",
 ];
 
 // Función para hacer preguntas del formulario inicial para colaboradores
-export async function askCollaboratorFormQuestions(ctx: any, questionIndex: number) {
+export async function askCollaboratorFormQuestions(
+  ctx: any,
+  questionIndex: number,
+) {
   if (questionIndex < initialCollaboratorFormQuestions.length) {
     ctx.session.collaboratorQuestionIndex = questionIndex;
     await ctx.reply(initialCollaboratorFormQuestions[questionIndex]);
@@ -88,15 +112,24 @@ export async function askCollaboratorFormQuestions(ctx: any, questionIndex: numb
         "No he podido conseguir tu nombre de usuario de Telegram. Por favor, establece un usuario de telegram y vuelve a intentarlo.",
         {
           reply_markup: {
-            inline_keyboard: [[{ text: "Reintentar", callback_data: "retry_username" }]],
+            inline_keyboard: [[{
+              text: "Reintentar",
+              callback_data: "retry_username",
+            }]],
           },
-        }
+        },
       );
       return;
     }
 
-    await saveCollaborator(ctx.from?.id, ctx.session.collaboratorAnswers, ctx.from?.username);
-    await ctx.reply("Formulario de colaborador completado. Gracias por ofrecer tu ayuda.");
+    await saveCollaborator(
+      ctx.from?.id,
+      ctx.session.collaboratorAnswers,
+      ctx.from?.username,
+    );
+    await ctx.reply(
+      "Formulario de colaborador completado. Gracias por ofrecer tu ayuda.",
+    );
     ctx.session.role = AvailableRoles.COLLABORATOR;
     ctx.session.collaboratorQuestionIndex = undefined;
     ctx.session.collaboratorAnswers = [];

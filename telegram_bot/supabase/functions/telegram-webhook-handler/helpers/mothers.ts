@@ -1,4 +1,4 @@
-import { AvailableRoles, flushSessionForms } from "../index.ts";
+import { AvailableRoles, flushSessionForms, showRegistrationMainMenu } from "../index.ts";
 import { askHelpRequestQuestions } from "./helpRequests.ts";
 import { supabase } from "./supabase.ts";
 
@@ -78,10 +78,6 @@ const initialMotherFormQuestions = [
 export async function handleMotherButtonsCallbacks(ctx: any) {
   const choice = ctx.callbackQuery?.data;
 
-  if (choice === "retry_username" && ctx.session.motherQuestionIndex !== undefined) {
-    await askMotherFormQuestions(ctx, ctx.session.motherQuestionIndex);
-  }
-
   if (choice === "mother_pedir_ayuda") {
     await flushSessionForms(ctx); // Resetear los formularios en la sesión
     await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
@@ -112,6 +108,44 @@ export async function handleMotherButtonsCallbacks(ctx: any) {
   if (fieldMapping[choice]) {
     ctx.session.currentEditingField = fieldMapping[choice];
     await ctx.reply(`Introduce el nuevo valor para ${fieldMapping[choice].replace("_", " ")}:`);
+  }
+
+  if (choice === "confirm_mother_registration") {
+    const username = ctx.from?.username;
+    if (!username) {
+      await ctx.reply(
+        "No he podido conseguir tu nombre de usuario de Telegram. Por favor, establece un usuario de telegram y vuelve a intentarlo.",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "Reintentar",
+                  callback_data: "confirm_mother_registration",
+                },
+              ],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    // Si no hay más preguntas, guardar respuestas y cambiar el rol a madre
+    await saveMother(ctx.from?.id, ctx.session.motherAnswers, ctx.from?.username); // Guardar respuestas en la base de datos
+    await ctx.reply("Formulario completado. Ahora puedes solicitar ayuda desde el menu abajo.");
+    ctx.session.role = AvailableRoles.MOTHER;
+    ctx.session.motherQuestionIndex = undefined;
+    ctx.session.motherAnswers = [];
+    await showMainMotherMenu(ctx);
+
+  }
+
+  if (choice === "cancel_mother_registration") {
+    await ctx.reply("No te preocupes, vuelve a intentarlo cuando quieras.");
+    ctx.session.motherQuestionIndex = undefined;
+    ctx.session.motherAnswers = [];
+    await showRegistrationMainMenu(ctx);
   }
 }
 
@@ -155,7 +189,26 @@ export async function askMotherFormQuestions(ctx: any, questionIndex: number) {
     // Si hay más preguntas, preguntar la siguiente
     ctx.session.motherQuestionIndex = questionIndex;
     await ctx.reply(initialMotherFormQuestions[questionIndex]);
-  } else {
+  } else if (questionIndex === initialMotherFormQuestions.length) {
+    // Enviar un mensaje de confirmación antes de registrar la madre
+    const [nombreCompleto, telefono, calleNumeroPiso, puebloAfectado, codigoPostal, descripcion] =
+      ctx.session.motherAnswers;
+    const summaryMessage = `Nombre: ${nombreCompleto}
+Teléfono: ${telefono}
+Dirección: ${calleNumeroPiso}
+Pueblo afectado: ${puebloAfectado}
+Código Postal: ${codigoPostal}
+Descripción: ${descripcion}`;
+    await ctx.reply("¿Estás seguro de que quieres registrar estos datos?", {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "Sí", callback_data: "confirm_mother_registration" }],
+          [{ text: "No", callback_data: "cancel_mother_registration" }],
+        ],
+      },
+    });
+  }
+  /* else {
     // Intentar conseguir el nombre de usuario, si no hay, pedir que se lo haga y lo vuelva a intentar
     const username = ctx.from?.username;
     if (!username) {
@@ -184,7 +237,7 @@ export async function askMotherFormQuestions(ctx: any, questionIndex: number) {
     ctx.session.motherQuestionIndex = undefined;
     ctx.session.motherAnswers = [];
     await showMainMotherMenu(ctx);
-  }
+  } */
 }
 //#endregion
 

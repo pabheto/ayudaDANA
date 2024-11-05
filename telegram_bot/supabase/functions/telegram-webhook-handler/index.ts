@@ -47,6 +47,17 @@ export function isBlacklisted(ctx: any) {
   return BLACKLISTED_CHAT_IDS.includes(ctx.from?.id);
 }
 
+export async function showRegistrationMainMenu(ctx: any) {
+  await ctx.reply("Bienvenido. ¿Eres madre o profesional?", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "Madre", callback_data: "role_madre" }],
+        [{ text: "Profesional", callback_data: "role_colaborador" }],
+      ],
+    },
+  });
+}
+
 export async function flushSessionForms(ctx: any) {
   // Function para resetear todos los states de los formularios en la sesión
   ctx.session.motherQuestionIndex = undefined;
@@ -167,14 +178,7 @@ telegramBot.command("start", async (ctx) => {
     }
   }
 
-  await ctx.reply("Bienvenido. ¿Eres madre o profesional?", {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "Madre", callback_data: "role_madre" }],
-        [{ text: "Profesional", callback_data: "role_colaborador" }],
-      ],
-    },
-  });
+  await showRegistrationMainMenu(ctx);
 });
 
 // Manejo de las respuestas a botones

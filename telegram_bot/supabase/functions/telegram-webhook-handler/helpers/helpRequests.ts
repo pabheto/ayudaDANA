@@ -73,7 +73,7 @@ export enum HelpSpecialities {
   FISIOTERAPIA_SUELO_PELVICO = "Fisioterapia de suelo pélvico",
   DOULA = "Doula",
   ASESORIA_LACTANCIA = "Asesoría de lactancia",
-  OTROS = "Otros",
+  // OTROS = "Otros",
 }
 
 function createSpecialitiesKeyboard() {
@@ -225,16 +225,73 @@ export async function handleHelpRequestsButtonsCallbacks(ctx: any) {
 //#endregion
 
 //#region Gestión de solicitudes de ayuda en tiempo real
-const STREAM_HELP_REQUEST_CHAT_IDS = [412430132, 9150852, 280023];
+// const STREAM_HELP_REQUEST_CHAT_IDS = [412430132, 9150852, 280023];
 
 const STREAM_HELP_REQUEST_THREAD_IDS_MAP: Record<HelpSpecialities, { chatId: number; threadId: string }[]> = {
-  [HelpSpecialities.PSICOLOGIA_PERINATAL]: [],
-  [HelpSpecialities.PSICOLOGIA_INFANTIL]: [],
-  [HelpSpecialities.PEDIATRIA]: [],
-  [HelpSpecialities.OTROS]: [
+  [HelpSpecialities.PSICOLOGIA_PERINATAL]: [
+    {
+      chatId: -1002266155232,
+      threadId: "20",
+    },
+  ],
+  [HelpSpecialities.PSICOLOGIA_INFANTIL]: [
+    {
+      chatId: -1002266155232,
+      threadId: "23",
+    },
+  ],
+  [HelpSpecialities.PEDIATRIA]: [
+    {
+      chatId: -1002266155232,
+      threadId: "25",
+    },
+  ],
+  /*[HelpSpecialities.OTROS]: [
     {
       chatId: -1002266155232,
       threadId: "49",
+    },
+  ],*/
+  [HelpSpecialities.MATRONA_GINECOLOGIA]: [
+    {
+      chatId: -1002266155232,
+      threadId: "27",
+    },
+  ],
+  [HelpSpecialities.ENFERMERIA_PEDIATRICA]: [
+    {
+      chatId: -1002266155232,
+      threadId: "29",
+    },
+  ],
+  [HelpSpecialities.LOGOPEDIA_NEONATAL]: [
+    {
+      chatId: -1002266155232,
+      threadId: "31",
+    },
+  ],
+  [HelpSpecialities.FISIOTERAPIA_PEDIATRICA_RESPIRATORIA]: [
+    {
+      chatId: -1002266155232,
+      threadId: "33",
+    },
+  ],
+  [HelpSpecialities.FISIOTERAPIA_SUELO_PELVICO]: [
+    {
+      chatId: -1002266155232,
+      threadId: "35",
+    },
+  ],
+  [HelpSpecialities.DOULA]: [
+    {
+      chatId: -1002266155232,
+      threadId: "37",
+    },
+  ],
+  [HelpSpecialities.ASESORIA_LACTANCIA]: [
+    {
+      chatId: -1002266155232,
+      threadId: "39",
     },
   ],
 };

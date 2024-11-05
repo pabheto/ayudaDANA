@@ -8,7 +8,10 @@ import {
   checkCollaboratorExists,
   showCollaboratorMenu,
 } from "./helpers/collaborators.ts";
-import { askHelpRequestQuestions } from "./helpers/helpRequests.ts";
+import {
+  askHelpRequestQuestions,
+  setupSpecialityHandler,
+} from "./helpers/helpRequests.ts";
 import {
   askMotherFormQuestions,
   checkMotherExists,
@@ -210,7 +213,10 @@ bot.command("ayuda", async (ctx) => {
   );
 });
 
+/* -------------------------------- Handlers -------------------------------- */
+// Handler para manejar las actualizaciones de Telegram
 const handleUpdate = webhookCallback(bot, "std/http");
+// setupSpecialityHandler(bot);
 
 Deno.serve(async (req) => {
   try {

@@ -235,6 +235,9 @@ telegramBot.on("callback_query:data", async (ctx) => {
 
 // Respuesta a mensajes de texto (principalmente para responder formularios)
 telegramBot.on("message:text", async (ctx) => {
+  console.debug("Received text message");
+  console.debug("Session:", ctx.session);
+  console.debug("Message text:", ctx.message.text);
   // Gestión de administración
   if (isAdministrator(ctx)) {
     await handleAdministrationTextCallbacks(ctx);
@@ -248,6 +251,7 @@ telegramBot.on("message:text", async (ctx) => {
     ctx.session.collaboratorQuestionIndex != undefined ||
     ctx.session.role === AvailableRoles.COLLABORATOR
   ) {
+    console.debug("Handling collaborator text callbacks");
     await handleCollaboratorTextCallbacks(ctx);
   }
 
@@ -255,10 +259,12 @@ telegramBot.on("message:text", async (ctx) => {
     ctx.session.motherQuestionIndex != undefined ||
     ctx.session.role === AvailableRoles.MOTHER
   ) {
+    console.debug("Handling mother text callbacks");
     await handleMotherTextCallbacks(ctx);
   }
 
   if (ctx.session.role === AvailableRoles.MOTHER) {
+    console.debug("Handling help request text callbacks");
     await handleHelpRequestsTextCallbacks(ctx);
   }
 });

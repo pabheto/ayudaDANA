@@ -56,7 +56,15 @@ export async function checkCollaboratorExists(
   ).single();
 
   if (error) {
-    console.error("Error checking collaborator:", error);
+    // If error.details contains "contains 0 rows" it means the collaborator doesn't exist yet
+    // Do not log an error
+    if (error.details.includes("contains 0 rows")) {
+      console.log("Collaborator not found");
+    } else {
+      console.warn("Error checking collaborator:", error);
+    }
+
+    // Return false if there was an error
     return false;
   }
 
@@ -75,9 +83,42 @@ export async function getCollaborator(userId: number | undefined) {
 //#endregion
 
 //#region Formularios
-
+// Callbacks para los botones
 export async function handleCollaboratorButtonsCallbacks(ctx: any) {
-  // TODO: Añadir lógica para manejar los botones
+  // Gestión de los botones de la especialidad
+  if (ctx.session.collaboratorQuestionIndex === 4) {
+    console.log("Seleccionado botón de especialidad ", ctx.callbackQuery);
+    if (!ctx.callbackQuery?.data.startsWith("speciality_")) {
+      await ctx.reply(
+        "Por favor, selecciona una opción ",
+        createSpecialitiesKeyboard(),
+      );
+      return false;
+    }
+
+    const specialityKey = ctx.callbackQuery.data.replace("speciality_", "");
+    let specialityContent = HelpSpecialities[specialityKey];
+    if (!specialityContent) {
+      specialityContent = HelpSpecialities.OTROS;
+    }
+    ctx.session.collaboratorAnswers[ctx.session.collaboratorQuestionIndex] =
+      specialityContent;
+
+    // Show selected speciality and move to next question
+    await ctx.reply(`Especialidad seleccionada: ${specialityContent}`);
+    await askCollaboratorFormQuestions(
+      ctx,
+      ctx.session.collaboratorQuestionIndex + 1,
+    );
+
+    // Answer the callback query to remove loading state
+    // await ctx.answerCallbackQuery();
+
+    // Delete the menu message
+    // await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
+
+    return true; // Handled the callback
+  }
 
   if (
     choice === "retry_username" &&
@@ -91,11 +132,24 @@ export async function handleCollaboratorButtonsCallbacks(ctx: any) {
 }
 
 export async function handleCollaboratorTextCallbacks(ctx: any) {
-  // TODO: Añadir lógica para manejar los textos
-  if (ctx.session.collaboratorQuestionIndex != undefined) {
+  if (
+    ctx.session.collaboratorQuestionIndex != undefined ||
+    ctx.session.collaboratorQuestionIndex != null
+  ) {
     const questionIndex = ctx.session.collaboratorQuestionIndex;
-    ctx.session.collaboratorAnswers[questionIndex] = ctx.message.text;
-    await askCollaboratorFormQuestions(ctx, questionIndex + 1);
+
+    if (questionIndex === 4) {
+      // Estamos esperando respuesta de un botón, no de un texto
+      // Enviar un mensaje diciendo que se debe seleccionar una opción
+      await ctx.reply(
+        "Por favor, selecciona una opción pulsando en el botón ",
+        createSpecialitiesKeyboard(),
+      );
+    } else {
+      // Estamos esperando respuesta de un texto
+      ctx.session.collaboratorAnswers[questionIndex] = ctx.message.text;
+      await askCollaboratorFormQuestions(ctx, questionIndex + 1);
+    }
   }
 }
 
@@ -109,6 +163,54 @@ export const initialCollaboratorFormQuestions = [
   "Escribe tu número de colegiado (opcional)",
 ];
 
+export enum HelpSpecialities {
+  PSICOLOGIA_PERINATAL = "Psicología perinatal",
+  PSICOLOGIA_INFANTIL = "Psicología infantil",
+  PEDIATRIA = "Pediatría",
+  MATRONA_GINECOLOGIA = "Matrona y ginecología",
+  ENFERMERIA_PEDIATRICA = "Enfermería pediátrica",
+  LOGOPEDIA_NEONATAL = "Logopedia neonatal",
+  FISIOTERAPIA_PEDIATRICA_RESPIRATORIA =
+    "Fisioterapia pediátrica y respiratoria",
+  FISIOTERAPIA_SUELO_PELVICO = "Fisioterapia de suelo pélvico",
+  DOULA = "Doula",
+  ASESORIA_LACTANCIA = "Asesoría de lactancia",
+  // OTROS = "Otros",
+}
+
+function createSpecialitiesKeyboard() {
+  // Crear dos columnas para mostrar las especialidades
+
+  // Inicializar el teclado
+  const keyboard = [];
+
+  // Crear dos columnas
+  const specialities = Object.entries(HelpSpecialities);
+
+  for (let i = 0; i < specialities.length; i += 2) {
+    const row = [];
+
+    for (let j = 0; j < 2; j++) {
+      const index = i + j;
+      if (index < specialities.length) {
+        const [key, value] = specialities[index];
+        row.push({
+          text: value,
+          callback_data: `speciality_${key}`,
+        });
+      }
+    }
+
+    keyboard.push(row);
+  }
+
+  return {
+    reply_markup: {
+      inline_keyboard: keyboard,
+    },
+  };
+}
+
 // Función para hacer preguntas del formulario inicial para colaboradores
 export async function askCollaboratorFormQuestions(
   ctx: any,
@@ -116,7 +218,14 @@ export async function askCollaboratorFormQuestions(
 ) {
   if (questionIndex < initialCollaboratorFormQuestions.length) {
     ctx.session.collaboratorQuestionIndex = questionIndex;
-    await ctx.reply(initialCollaboratorFormQuestions[questionIndex]);
+    const question = initialCollaboratorFormQuestions[questionIndex];
+
+    if (questionIndex === 4) {
+      // Por cada especialidad, mostrar un botón
+      await ctx.reply(question, createSpecialitiesKeyboard());
+    } else {
+      await ctx.reply(question);
+    }
   } else {
     const username = ctx.from?.username;
     if (!username) {

@@ -335,26 +335,22 @@ export async function showMotherHelpRequestsMenu(ctx: any) {
   // Muestra cada solicitud de ayuda
   for (const request of requests) {
     const attendedBy = request.collaborator
-      ? `Atendida por: ${request.collaborator[0]?.nombre_completo} (https://t.me/${request.collaborator[0]?.telegram_username})`
+      ? `- **Atendida por:** [${request.collaborator.nombre_completo}](https://t.me/${request.collaborator?.telegram_username})\n`
       : null;
     const attendedAt = request.attended_at
-      ? `Fecha de atención: ${new Date(request.attended_at).toLocaleString()}`
+      ? `- **Fecha de atención:** ${new Date(request.attended_at).toLocaleString()}`
       : null;
 
     const requestMessage = `
-Solicitud #${request.id} (${new Date(request.created_at).toLocaleString()})
-- Nivel de urgencia: ${request.nivel_urgencia}
-- Especialidad: ${request.especialidad}
-- Motivo de consulta: ${request.motivo_consulta}
-${attendedBy ? `- Atendida por: ${attendedBy}\n` : "Sin Atender"}
-${attendedAt ? `- Fecha de atención: ${attendedAt}\n` : ""}
+**Solicitud #${request.id}** (${new Date(request.created_at).toLocaleString()})
+- **Nivel de urgencia:** ${request.nivel_urgencia}
+- **Especialidad:** ${request.especialidad}
+- **Motivo de consulta:** ${request.motivo_consulta}
+${attendedBy ? attendedBy : "**Sin Atender**"}
+${attendedAt ? ` ${attendedAt}\n` : ""}
     `;
 
-    await ctx.reply(requestMessage, {
-      reply_markup: {
-        inline_keyboard: [[{ text: "Ver Detalles", callback_data: `view_request_${request.id}` }]],
-      },
-    });
+    await ctx.reply(requestMessage, { parse_mode: "Markdown" });
   }
 }
 //#endregion

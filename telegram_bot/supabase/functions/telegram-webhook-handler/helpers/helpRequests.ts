@@ -42,24 +42,27 @@ export const helpRequestQuestions = [
   "Describe brevemente el motivo de tu consulta",
 ];
 
-export const specialities = [
-  "Psicología perinatal",
-  "Psicología infantil",
-  "Pediatría",
-  "Matrona y ginecología",
-  "Enfermería pediátrica",
-  "Logopedia neonatal",
-  "Fisioterapia pediátrica y respiratoria",
-  "Fisioterapia de suelo pélvico",
-  "Doula",
-  "Asesoría de lactancia",
-];
+export enum HelpSpecialities {
+  PSICOLOGIA_PERINATAL = "Psicología perinatal",
+  PSICOLOGIA_INFANTIL = "Psicología infantil",
+  PEDIATRIA = "Pediatría",
+  MATRONA_GINECOLOGIA = "Matrona y ginecología",
+  ENFERMERIA_PEDIATRICA = "Enfermería pediátrica",
+  LOGOPEDIA_NEONATAL = "Logopedia neonatal",
+  FISIOTERAPIA_PEDIATRICA_RESPIRATORIA = "Fisioterapia pediátrica y respiratoria",
+  FISIOTERAPIA_SUELO_PELVICO = "Fisioterapia de suelo pélvico",
+  DOULA = "Doula",
+  ASESORIA_LACTANCIA = "Asesoría de lactancia",
+}
 
 function createSpecialitiesKeyboard() {
   // Crear dos columnas para mostrar las especialidades
 
   // Inicializar el teclado
   const keyboard = [];
+
+  // Obtener las especialidades del enum HelpSpecialities
+  const specialities = Object.values(HelpSpecialities);
 
   // Recorrer las especialidades y añadirlas al teclado
   for (let i = 0; i < specialities.length; i += 2) {

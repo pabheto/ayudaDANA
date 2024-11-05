@@ -117,15 +117,23 @@ telegramBot.use(
 // Comando /start para iniciar el flujo de selección
 telegramBot.command("start", async (ctx) => {
   if (isAdministrator(ctx)) {
+    console.debug("User is administrator");
     await showAdministrationMenu(ctx);
 
     return;
   }
 
   if (ctx.session.role === AvailableRoles.MOTHER) {
+    console.debug("User is mother, checking if exists in database");
     const motherExists = await checkMotherExists(ctx.from?.id);
     if (motherExists) {
+      // Mother exists, show main mother menu
+      console.debug("Mother exists, showing main mother menu");
       return await showMainMotherMenu(ctx);
+    } else {
+      // If mother doesn't exist, reset the session
+      await flushSessionForms(ctx);
+      ctx.session.role = undefined;
     }
   }
 
@@ -141,6 +149,10 @@ telegramBot.command("start", async (ctx) => {
 
 // Manejo de las respuestas a botones
 telegramBot.on("callback_query:data", async (ctx) => {
+  console.debug("Received callback query");
+  console.debug("Session:", ctx.session);
+  console.debug("Callback data:", ctx.callbackQuery?.data);
+
   // Gestión de administración
   if (isAdministrator(ctx)) {
     await handleAdministrationButtonsCallbacks(ctx);
@@ -148,28 +160,35 @@ telegramBot.on("callback_query:data", async (ctx) => {
     return;
   }
 
+  // Handlers for mother question callbacks
   if (
     ctx.session.role === AvailableRoles.MOTHER ||
     ctx.session.motherQuestionIndex !== undefined
   ) {
+    console.debug("Handling mother question callbacks");
     await handleHelpRequestsButtonsCallbacks(ctx);
     await handleMotherButtonsCallbacks(ctx);
 
     return;
   }
 
+  // Handlers for collaborator question callbacks
   if (
-    ctx.session.collaboratorQuestionIndex != undefined ||
-    ctx.session.role === AvailableRoles.COLLABORATOR
+    ctx.session.role === AvailableRoles.COLLABORATOR ||
+    ctx.session.collaboratorQuestionIndex !== undefined
   ) {
+    console.debug("Handling collaborator question callbacks");
     await handleCollaboratorButtonsCallbacks(ctx);
 
     return;
   }
 
+  // Callbacks for main menu buttons
   const choice = ctx.callbackQuery?.data;
 
   if (choice === "role_madre") {
+    console.debug("New user selected role madre");
+
     await ctx.reply(
       "Gracias. Vamos a completar el formulario inicial para crear la conexión madre-profesional.",
     );
@@ -178,6 +197,8 @@ telegramBot.on("callback_query:data", async (ctx) => {
   }
 
   if (choice === "role_colaborador") {
+    console.debug("New user selected role colaborador");
+
     await ctx.reply(
       "Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional.",
     );

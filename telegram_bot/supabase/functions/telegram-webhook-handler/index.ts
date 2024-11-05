@@ -41,6 +41,12 @@ export interface SessionData {
   currentEditingField?: string;
 }
 
+export const BLACKLISTED_CHAT_IDS = [-1002266155232];
+
+export function isBlacklisted(ctx: any) {
+  return BLACKLISTED_CHAT_IDS.includes(ctx.from?.id);
+}
+
 export async function flushSessionForms(ctx: any) {
   // Function para resetear todos los states de los formularios en la sesión
   ctx.session.motherQuestionIndex = undefined;
@@ -112,6 +118,10 @@ telegramBot.use(
 
 // Comando /start para iniciar el flujo de selección
 telegramBot.command("start", async (ctx) => {
+  if (isBlacklisted(ctx)) {
+    return;
+  }
+
   if (isAdministrator(ctx)) {
     console.debug("User is administrator");
     await showAdministrationMenu(ctx);
@@ -169,10 +179,13 @@ telegramBot.command("start", async (ctx) => {
 
 // Manejo de las respuestas a botones
 telegramBot.on("callback_query:data", async (ctx) => {
+  if (isBlacklisted(ctx)) {
+    return;
+  }
+
   console.debug("Received callback query");
   console.debug("Session:", ctx.session);
   console.debug("Callback data:", ctx.callbackQuery?.data);
-
 
   const choice = ctx.callbackQuery?.data;
 
@@ -184,7 +197,11 @@ telegramBot.on("callback_query:data", async (ctx) => {
   }
 
   // Handlers for mother question callbacks
-  if (ctx.session.role === AvailableRoles.MOTHER || ctx.session.motherQuestionIndex !== undefined || choice.startsWith("helpRequest_attend_")) {
+  if (
+    ctx.session.role === AvailableRoles.MOTHER ||
+    ctx.session.motherQuestionIndex !== undefined ||
+    choice.startsWith("helpRequest_attend_")
+  ) {
     console.debug("Handling mother question callbacks");
     await handleHelpRequestsButtonsCallbacks(ctx);
     await handleMotherButtonsCallbacks(ctx);
@@ -193,14 +210,12 @@ telegramBot.on("callback_query:data", async (ctx) => {
   }
 
   // Handlers for collaborator question callbacks
-  if (ctx.session.role === AvailableRoles.COLLABORATOR || ctx.session.collaboratorQuestionIndex !== undefined ) {
+  if (ctx.session.role === AvailableRoles.COLLABORATOR || ctx.session.collaboratorQuestionIndex !== undefined) {
     console.debug("Handling collaborator question callbacks");
     await handleCollaboratorButtonsCallbacks(ctx);
 
     return;
   }
-
-  
 
   if (choice === "role_madre") {
     console.debug("New user selected role madre");
@@ -221,6 +236,10 @@ telegramBot.on("callback_query:data", async (ctx) => {
 
 // Respuesta a mensajes de texto (principalmente para responder formularios)
 telegramBot.on("message:text", async (ctx) => {
+  if (isBlacklisted(ctx)) {
+    return;
+  }
+
   console.debug("Received text message");
   console.debug("Session:", ctx.session);
   console.debug("Message text:", ctx.message.text);

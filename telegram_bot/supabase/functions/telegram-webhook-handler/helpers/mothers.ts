@@ -13,14 +13,14 @@ export async function getMother(userId: number | undefined): Promise<any> {
 
 export async function saveMother(
   userId: number | undefined,
-  answers: string[]
+  answers: string[],
 ): Promise<void> {
   if (!userId || answers.length < 6) return;
 
   const [
     nombreCompleto,
-    contacto,
-    ubicacion,
+    telefono,
+    calleNumeroPiso,
     puebloAfectado,
     codigoPostal,
     descripcion,
@@ -29,8 +29,8 @@ export async function saveMother(
   const { error } = await supabase.from("mothers").insert({
     telegram_id: userId,
     nombre_completo: nombreCompleto,
-    contacto: contacto,
-    ubicacion: ubicacion,
+    telefono: telefono,
+    calle_numero_piso: calleNumeroPiso,
     pueblo_afectado: puebloAfectado,
     codigo_postal: codigoPostal,
     descripcion_dana: descripcion,
@@ -40,7 +40,7 @@ export async function saveMother(
 }
 
 export async function checkMotherExists(
-  userId: number | undefined
+  userId: number | undefined,
 ): Promise<boolean> {
   if (!userId) return false;
   const { data, error } = await supabase
@@ -61,12 +61,12 @@ export async function checkMotherExists(
 //#region Formulario inicial de registro para madres
 // Preguntas iniciales para las madres que solicitan ayuda
 const initialMotherFormQuestions = [
-  "Nombre completo",
-  "Contacto",
-  "Ubicación",
-  "Pueblo afectado",
-  "Código postal",
-  "Descripción de la situación DANA",
+  "Dime tu nombre y apellidos",
+  "Dame un teléfono de contacto",
+  "Dime tu calle, número y piso",
+  "¿En qué pueblo afectada por la DANA te encuentras?",
+  "Dime tu código postal",
+  "Describe brevemente cómo te ha afectado la DANA",
 ];
 
 //#endregion
@@ -75,16 +75,17 @@ const initialMotherFormQuestions = [
 // Registro de madres
 export async function askMotherFormQuestions(ctx: any, questionIndex: number) {
   if (questionIndex < initialMotherFormQuestions.length) {
+    // Si hay más preguntas, preguntar la siguiente
     ctx.session.motherQuestionIndex = questionIndex;
     await ctx.reply(initialMotherFormQuestions[questionIndex]);
   } else {
-    // Haciendo que este chat ID adquiera el rol de madre
+    // Si no hay más preguntas, guardar respuestas y cambiar el rol a madre
     ctx.session.role = AvailableRoles.MOTHER;
     ctx.session.motherQuestionIndex = undefined;
     ctx.session.motherAnswers = [];
     await saveMother(ctx.from?.id, ctx.session.motherAnswers); // Guardar respuestas en la base de datos
     await ctx.reply(
-      "Formulario completado. Ahora puedes solicitar ayuda con el comando /ayuda."
+      "Formulario completado. Ahora puedes solicitar ayuda con el comando /ayuda.",
     );
   }
 }
@@ -109,12 +110,12 @@ export async function showMotherDataMenu(ctx: any) {
   const mother = await getMother(ctx.from?.id);
   // Imprimir datos principales
   await ctx.reply(`Nombre: ${mother?.nombre_completo}`);
-  await ctx.reply(`Contacto: ${mother?.contacto}`);
-  await ctx.reply(`Ubicación: ${mother?.ubicacion}`);
+  await ctx.reply(`Contacto: ${mother?.telefono}`);
+  await ctx.reply(`Direccion: ${mother?.calle_numero_piso}`);
   await ctx.reply(`Pueblo afectado: ${mother?.pueblo_afectado}`);
   await ctx.reply(`Código postal: ${mother?.codigo_postal}`);
   await ctx.reply(
-    `Descripción de la situación DANA: ${mother?.descripcion_dana}`
+    `Descripción de la situación DANA: ${mother?.descripcion_dana}`,
   );
 
   // TODO: Añadir opciones para modificar los datos
@@ -123,7 +124,7 @@ export async function showMotherDataMenu(ctx: any) {
 
 export async function showMotherHelpRequestsMenu(ctx: any) {
   await ctx.reply(
-    "Aquí puedes ver y modificar tus solicitudes de ayuda. (TODO)"
+    "Aquí puedes ver y modificar tus solicitudes de ayuda. (TODO)",
   );
 
   // TODO: Añadir opciones para ver y modificar solicitudes de ayuda

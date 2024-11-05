@@ -62,11 +62,11 @@ export async function checkMotherExists(
 // Preguntas iniciales para las madres que solicitan ayuda
 const initialMotherFormQuestions = [
   "Dime tu nombre y apellidos",
-  "Dame un teléfono de contacto",
-  "Dime tu calle, número y piso",
-  "¿En qué pueblo afectada por la DANA te encuentras?",
-  "Dime tu código postal",
-  "Describe brevemente cómo te ha afectado la DANA",
+  "Escribe tu teléfono de contacto",
+  "⁠Escribe tu dirección",
+  "¿En qué pueblo afectado por DANA te encuentras?",
+  "Escribe el código postal",
+  "Describe qué daños te ha causado la situación DANA y cuál es tu situación actual.",
 ];
 
 //#endregion

@@ -136,7 +136,7 @@ bot.on("callback_query:data", async (ctx) => {
 
   if (choice === "role_madre") {
     await ctx.reply(
-      "Gracias por tu interés. Vamos a completar el formulario inicial.",
+      "Gracias. Vamos a completar el formulario inicial para crear la conexión madre-profesional.",
     );
     await flushSessionForms(ctx); // Resetear los formularios en la sesión
     await askMotherFormQuestions(ctx, 0); // Inicia las preguntas para madre

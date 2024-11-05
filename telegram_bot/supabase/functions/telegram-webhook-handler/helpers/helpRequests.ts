@@ -508,7 +508,8 @@ Por favor, contacta con ella a través de su Telegram: [${mother.nombre_completo
 
       await telegramBot.api.sendMessage(
         helpRequest.mother_telegram_id,
-        `Hola ${mother.nombre_completo}. El profesional *${collaborator?.nombre_completo}* te está contactando para atender tu solicitud: "${helpRequest.motivo_consulta}"
+        `Hola ${mother.nombre_completo}. El profesional *${collaborator?.nombre_completo}* te está contactando para atender tu solicitud: 
+"${helpRequest.motivo_consulta}"
 Puedes ponerte en contacto con él a través de su Telegram si no te ha contactado en los próximos minutos: [${collaborator.nombre_completo}](https://t.me/${collaborator.telegram_username})
         `,
         {

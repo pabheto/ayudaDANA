@@ -26,20 +26,15 @@ export async function saveMother(
     descripcion,
   ] = answers;
 
-  const { error } = await supabase.from("mothers").upsert(
-    {
-      telegram_id: userId,
-      nombre_completo: nombreCompleto,
-      contacto: contacto,
-      ubicacion: ubicacion,
-      pueblo_afectado: puebloAfectado,
-      codigo_postal: codigoPostal,
-      descripcion_dana: descripcion,
-    },
-    {
-      onConflict: "telegram_id",
-    }
-  );
+  const { error } = await supabase.from("mothers").insert({
+    telegram_id: userId,
+    nombre_completo: nombreCompleto,
+    contacto: contacto,
+    ubicacion: ubicacion,
+    pueblo_afectado: puebloAfectado,
+    codigo_postal: codigoPostal,
+    descripcion_dana: descripcion,
+  });
 
   if (error) console.error("Error saving mother:", error);
 }
@@ -85,12 +80,12 @@ export async function askMotherFormQuestions(ctx: any, questionIndex: number) {
   } else {
     // Haciendo que este chat ID adquiera el rol de madre
     ctx.session.role = AvailableRoles.MOTHER;
+    ctx.session.motherQuestionIndex = undefined;
+    ctx.session.motherAnswers = [];
     await saveMother(ctx.from?.id, ctx.session.motherAnswers); // Guardar respuestas en la base de datos
     await ctx.reply(
       "Formulario completado. Ahora puedes solicitar ayuda con el comando /ayuda."
     );
-    ctx.session.motherQuestionIndex = undefined;
-    ctx.session.motherAnswers = [];
   }
 }
 //#endregion

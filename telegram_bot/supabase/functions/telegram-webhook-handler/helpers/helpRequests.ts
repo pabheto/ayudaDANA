@@ -10,7 +10,7 @@ export async function saveHelpRequest(
   const [nivelUrgencia, especialidad, motivoConsulta] = answers;
 
   const { error } = await supabase.from("help_requests").insert({
-    telegram_id: userId,
+    mother_telegram_id: userId,
     nivel_urgencia: nivelUrgencia,
     especialidad: especialidad,
     motivo_consulta: motivoConsulta,

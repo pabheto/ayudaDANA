@@ -3,7 +3,10 @@ import {
   session,
   webhookCallback,
 } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
-import { askCollaboratorFormQuestions } from "./helpers/collaborators.ts";
+import {
+  askCollaboratorFormQuestions,
+  showCollaboratorMenu,
+} from "./helpers/collaborators.ts";
 import { askHelpRequestQuestions } from "./helpers/helpRequests.ts";
 import {
   askMotherFormQuestions,
@@ -176,12 +179,18 @@ bot.command("ayuda", async (ctx) => {
     if (motherExists) {
       await ctx.reply("Por favor responde las siguientes preguntas:");
       await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
+      return;
     }
-  } else {
-    await ctx.reply(
-      "Primero te debes registrar como persona afectada en el sistema usando el comando /start."
-    );
   }
+
+  if (ctx.role === AvailableRoles.COLLABORATOR) {
+    await showCollaboratorMenu(ctx);
+    return;
+  }
+
+  await ctx.reply(
+    "Primero te debes registrar como persona afectada en el sistema usando el comando /start."
+  );
 });
 
 const handleUpdate = webhookCallback(bot, "std/http");

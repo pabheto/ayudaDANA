@@ -51,7 +51,7 @@ export async function checkCollaboratorExists(
 }
 //#endregion
 
-//#region Formulario inicial de registro para colaboradores
+//#region Formularios
 // Preguntas iniciales para los colaboradores
 export const initialCollaboratorFormQuestions = [
   "Nombre completo",
@@ -73,11 +73,17 @@ export async function askCollaboratorFormQuestions(
   } else {
     ctx.session.role = AvailableRoles.COLLABORATOR;
     await saveCollaborator(ctx.from?.id, ctx.session.collaboratorAnswers);
+    ctx.session.collaboratorQuestionIndex = undefined;
+    ctx.session.collaboratorAnswers = [];
     await ctx.reply(
       "Formulario de colaborador completado. Gracias por ofrecer tu ayuda."
     );
-    ctx.session.collaboratorAnswers = [];
-    ctx.session.collaboratorQuestionIndex = undefined;
   }
+}
+//#endregion
+
+//#region Menús
+export async function showCollaboratorMenu(ctx: any) {
+  await ctx.reply("Menú de colaborador (TODO)");
 }
 //#endregion

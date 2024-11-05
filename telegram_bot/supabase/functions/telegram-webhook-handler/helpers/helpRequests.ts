@@ -270,15 +270,46 @@ export async function streamHelpRequest(helpRequestId: number | undefined) {
     targetThreads = STREAM_HELP_REQUEST_THREAD_IDS_MAP[HelpSpecialities.OTROS];
   }
 
+  let messageIds: number[] = [];
   for (const threadInfo of targetThreads) {
-    await telegramBot.api.sendMessage(threadInfo.chatId, message, {
-      message_thread_id: threadInfo.threadId,
-    });
+    const messageResponse = await telegramBot.api.sendMessage(
+      threadInfo.chatId,
+      message,
+      {
+        message_thread_id: threadInfo.threadId,
+      },
+      {
+        reply_markup: inlineKeyboard,
+      }
+    );
+    console.log("Message sent to thread", threadInfo.chatId, messageResponse);
+    const messageId = messageResponse.message_id;
+
+    messageIds.push(messageId);
   }
+
+  // Guardar los ids de los mensajes en la base de datos
+  await supabase
+    .from("help_requests")
+    .update({
+      streaming_message_ids: messageIds,
+    })
+    .eq("id", helpRequestId);
+
+  console.log("Help request streamed and stored", helpRequestId);
+  return true;
 }
 
 export async function attendHelpRequest(helpRequestId: number) {
   const helpRequest = await getHelpRequest(helpRequestId);
+
+  if (!helpRequest) {
+    console.error("Help request not found");
+    return;
+  }
+
+  // Enviar un mensaje de confirmación al usuario
+  // await telegramBot.api.sendMessage(helpRequest.mother_telegram_id, "Tu solicitud de ayuda ha sido atendida. Pronto nos pondremos en contacto contigo.");
 }
 
 //#endregion

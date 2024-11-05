@@ -1,4 +1,5 @@
 import { AvailableRoles } from "../index.ts";
+import telegramBot from "./bot.ts";
 import { supabase } from "./supabase.ts";
 
 //#region Funciones CRUD para colaboradores
@@ -18,7 +19,18 @@ export async function saveCollaborator(
     numeroColegiado = null,
   ] = answers;
 
-  const { error } = await supabase.from("colaboradores").insert({
+  console.debug("Saving collaborator:", {
+    userId,
+    nombreCompleto,
+    telefono,
+    profesion,
+    formacionExperiencia,
+    tipoAyuda,
+    numeroColegiado,
+    telegramUsername,
+  });
+
+  const { error } = await supabase.from("collaborator").insert({
     telegram_id: userId,
     nombre_completo: nombreCompleto,
     telefono: telefono,
@@ -38,7 +50,7 @@ export async function checkCollaboratorExists(
   userId: number | undefined,
 ): Promise<boolean> {
   if (!userId) return false;
-  const { data, error } = await supabase.from("colaboradores").select("id").eq(
+  const { data, error } = await supabase.from("collaborator").select("id").eq(
     "telegram_id",
     userId,
   ).single();
@@ -130,6 +142,25 @@ export async function askCollaboratorFormQuestions(
     await ctx.reply(
       "Formulario de colaborador completado. Gracias por ofrecer tu ayuda.",
     );
+
+    // Add telegram user to the group with id -1002266155232
+    try {
+      // Use grammy
+      const chatLink = await telegramBot.api.createChatInviteLink(
+        "-1002266155232",
+        { member_limit: 1 },
+      );
+      await ctx.reply(
+        "Por favor, únete al grupo de colaboradores para poder colaborar con el resto de profesionales. " +
+          chatLink.invite_link,
+      );
+    } catch (error) {
+      console.error("Error adding user to group:", error);
+      await ctx.reply(
+        "Ha habido un error al añadirte al grupo. Por favor, contacta con el administrador.",
+      );
+    }
+
     ctx.session.role = AvailableRoles.COLLABORATOR;
     ctx.session.collaboratorQuestionIndex = undefined;
     ctx.session.collaboratorAnswers = [];
@@ -140,6 +171,8 @@ export async function askCollaboratorFormQuestions(
 //#region Menús
 export async function showCollaboratorMenu(ctx: any) {
   // Obteniendo el colaborador actual
-  await ctx.reply("Menú de colaborador (TODO)");
+  await ctx.reply(
+    "Ya estas dado de alta como profesional, si tienes alguna duda o necesitas ayuda, puedes preguntar en el grupo de colaboradores.",
+  );
 }
 //#endregion

@@ -472,7 +472,7 @@ export async function attendHelpRequest(ctx: any, helpRequestId: number) {
       await supabase
         .from("help_requests")
         .update({
-          attended_by_chat_id: collaborator.chat_id,
+          attended_by_chat_id: collaborator.telegram_id,
           attended_at: new Date().toISOString(),
           atendido_por_nombre: collaborator.nombre_completo,
           estado_solicitud: "ATENDIDA",

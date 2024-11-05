@@ -5,7 +5,10 @@ import { supabase } from "./supabase.ts";
 //#region Funciones CRUD para madres
 export async function getMother(userId: number | undefined): Promise<any> {
   if (!userId) return null;
-  const { data, error } = await supabase.from("mothers").select("*").eq("telegram_id", userId).single();
+  const { data, error } = await supabase.from("mothers").select("*").eq(
+    "telegram_id",
+    userId,
+  ).single();
 
   if (error) {
     console.error("Error getting mother:", error);
@@ -18,11 +21,18 @@ export async function getMother(userId: number | undefined): Promise<any> {
 export async function saveMother(
   userId: number | undefined,
   answers: string[],
-  telegramUsername: string | undefined
+  telegramUsername: string | undefined,
 ): Promise<void> {
   if (!userId || answers.length < 6) return;
 
-  const [nombreCompleto, telefono, calleNumeroPiso, puebloAfectado, codigoPostal, descripcion] = answers;
+  const [
+    nombreCompleto,
+    telefono,
+    calleNumeroPiso,
+    puebloAfectado,
+    codigoPostal,
+    descripcion,
+  ] = answers;
 
   const { error } = await supabase.from("mothers").insert({
     telegram_id: userId,
@@ -38,12 +48,25 @@ export async function saveMother(
   if (error) console.error("Error saving mother:", error);
 }
 
-export async function checkMotherExists(userId: number | undefined): Promise<boolean> {
+export async function checkMotherExists(
+  userId: number | undefined,
+): Promise<boolean> {
   if (!userId) return false;
-  const { data, error } = await supabase.from("mothers").select("id").eq("telegram_id", userId).single();
+  const { data, error } = await supabase.from("mothers").select("id").eq(
+    "telegram_id",
+    userId,
+  ).single();
 
   if (error) {
-    console.error("Error checking mother:", error);
+    // If error.details contains "contains 0 rows" it means the mother doesn't exist yet
+    // Do not log an error
+    if (error.details.includes("contains 0 rows")) {
+      console.log("Mother not found");
+    } else {
+      console.warn("Error checking mother:", error);
+    }
+
+    // Return false if there was an error
     return false;
   }
 
@@ -70,7 +93,9 @@ const initialMotherFormQuestions = [
 export async function handleMotherButtonsCallbacks(ctx: any) {
   const choice = ctx.callbackQuery?.data;
 
-  if (choice === "retry_username" && ctx.session.motherQuestionIndex !== undefined) {
+  if (
+    choice === "retry_username" && ctx.session.motherQuestionIndex !== undefined
+  ) {
     await askMotherFormQuestions(ctx, ctx.session.motherQuestionIndex);
   }
 
@@ -113,16 +138,25 @@ export async function askMotherFormQuestions(ctx: any, questionIndex: number) {
         "No he podido conseguir tu nombre de usuario de Telegram. Por favor, establece un usuario de telegram y vuelve a intentarlo.",
         {
           reply_markup: {
-            inline_keyboard: [[{ text: "Reintentar", callback_data: "retry_username" }]],
+            inline_keyboard: [[{
+              text: "Reintentar",
+              callback_data: "retry_username",
+            }]],
           },
-        }
+        },
       );
       return;
     }
 
     // Si no hay más preguntas, guardar respuestas y cambiar el rol a madre
-    await saveMother(ctx.from?.id, ctx.session.motherAnswers, ctx.from?.username); // Guardar respuestas en la base de datos
-    await ctx.reply("Formulario completado. Ahora puedes solicitar ayuda desde el menu abajo.");
+    await saveMother(
+      ctx.from?.id,
+      ctx.session.motherAnswers,
+      ctx.from?.username,
+    ); // Guardar respuestas en la base de datos
+    await ctx.reply(
+      "Formulario completado. Ahora puedes solicitar ayuda desde el menu abajo.",
+    );
     ctx.session.role = AvailableRoles.MOTHER;
     ctx.session.motherQuestionIndex = undefined;
     ctx.session.motherAnswers = [];
@@ -154,7 +188,9 @@ export async function showMotherDataMenu(ctx: any) {
   await ctx.reply(`Direccion: ${mother?.calle_numero_piso}`);
   await ctx.reply(`Pueblo afectado: ${mother?.pueblo_afectado}`);
   await ctx.reply(`Código postal: ${mother?.codigo_postal}`);
-  await ctx.reply(`Descripción de la situación DANA: ${mother?.descripcion_dana}`);
+  await ctx.reply(
+    `Descripción de la situación DANA: ${mother?.descripcion_dana}`,
+  );
   // await ctx.reply(`Usuario de telegram: ${mother?.telegram_username}`);
 
   // TODO: Añadir opciones para modificar los datos
@@ -162,7 +198,9 @@ export async function showMotherDataMenu(ctx: any) {
 }
 
 export async function showMotherHelpRequestsMenu(ctx: any) {
-  await ctx.reply("Aquí puedes ver y modificar tus solicitudes de ayuda. (TODO)");
+  await ctx.reply(
+    "Aquí puedes ver y modificar tus solicitudes de ayuda. (TODO)",
+  );
 
   // TODO: Añadir opciones para ver y modificar solicitudes de ayuda
 }

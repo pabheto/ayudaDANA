@@ -4,8 +4,10 @@ import {
 } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
 import {
   askCollaboratorFormQuestions,
+  checkCollaboratorExists,
   handleCollaboratorButtonsCallbacks,
   handleCollaboratorTextCallbacks,
+  showCollaboratorMenu,
 } from "./helpers/collaborators.ts";
 import {
   handleHelpRequestsButtonsCallbacks,
@@ -123,6 +125,12 @@ telegramBot.command("start", async (ctx) => {
     return;
   }
 
+  // If the user has no session role, ensure all the data is reset
+  if (!ctx.session.role) {
+    await flushSessionForms(ctx);
+  }
+
+  // If the user is a mother, check if they exist in the database
   if (ctx.session.role === AvailableRoles.MOTHER) {
     console.debug("User is mother, checking if exists in database");
     const motherExists = await checkMotherExists(ctx.from?.id);
@@ -132,6 +140,24 @@ telegramBot.command("start", async (ctx) => {
       return await showMainMotherMenu(ctx);
     } else {
       // If mother doesn't exist, reset the session
+      console.warn("Mother doesn't exist, resetting session");
+      await flushSessionForms(ctx);
+      ctx.session.role = undefined;
+    }
+  }
+
+  // Safeguard to check if a professional exists in the database if they have the role
+  if (ctx.session.role === AvailableRoles.COLLABORATOR) {
+    console.debug("User is collaborator, checking if exists in database");
+    const collaboratorExists = await checkCollaboratorExists(ctx.from?.id);
+
+    if (collaboratorExists) {
+      // Collaborator exists, show main collaborator menu
+      console.debug("Collaborator exists, showing main collaborator menu");
+      return await showCollaboratorMenu(ctx);
+    } else {
+      // If collaborator doesn't exist, reset the session
+      console.warn("Collaborator doesn't exist, resetting session");
       await flushSessionForms(ctx);
       ctx.session.role = undefined;
     }

@@ -1,4 +1,4 @@
-import { AvailableRoles } from "../index.ts";
+import { AvailableRoles, showRegistrationMainMenu } from "../index.ts";
 import telegramBot from "./bot.ts";
 import { supabase } from "./supabase.ts";
 
@@ -182,6 +182,13 @@ export async function handleCollaboratorButtonsCallbacks(ctx: any) {
     ctx.session.collaboratorAnswers = [];
   }
 
+  if (choice === "cancel_collaborator_registration") {
+    await ctx.reply("No te preocupes, vuelve a intentarlo cuando quieras.");
+    ctx.session.collaboratorQuestionIndex = undefined;
+    ctx.session.collaboratorAnswers = [];
+    await showRegistrationMainMenu(ctx);
+  }
+
   // Mapear los botones de edición a los campos de la base de datos
   const fieldMapping: { [key: string]: string } = {
     edit_nombre_completo: "nombre_completo",
@@ -243,7 +250,7 @@ export const initialCollaboratorFormQuestions = [
   "Escribe tu teléfono de contacto",
   "¿Cuál es tu profesión?",
   "¿Cuál es tu formación y experiencia en el área maternoinfantil?",
-  "Escribe el tipo de ayuda que puedes ofrecer (especialidad)",
+  "Escribe el tipo de ayuda que puedes ofrecer (especialidad; si tienes más de una, selecciona una y una vez dentro podrás entrar en la otra)",
   "Escribe tu número de colegiado (para especialidad sanitaria, si no, escribe “no soy sanitaria”)",
 ];
 

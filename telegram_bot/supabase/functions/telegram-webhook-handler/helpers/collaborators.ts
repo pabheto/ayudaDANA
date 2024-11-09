@@ -59,7 +59,7 @@ export const initialCollaboratorFormQuestions = [
   "Profesión",
   "Formación y experiencia en el área maternoinfantil",
   "Tipo de ayuda que puedes ofrecer (especialidad)",
-  "Número de colegiado (para especialidades sanitarias)",
+  "Escribe tu número de colegiado (para especialidad sanitaria, si no, escribe “no soy sanitaria”)",
 ];
 
 // Función para hacer preguntas del formulario inicial para colaboradores

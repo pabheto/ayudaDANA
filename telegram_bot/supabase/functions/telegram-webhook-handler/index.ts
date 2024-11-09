@@ -1,28 +1,32 @@
-import {
-  Bot,
-  session,
-  webhookCallback,
-} from "https://deno.land/x/grammy@v1.8.3/mod.ts";
+import { session, webhookCallback } from "https://deno.land/x/grammy@v1.8.3/mod.ts";
 import {
   askCollaboratorFormQuestions,
   checkCollaboratorExists,
+  handleCollaboratorButtonsCallbacks,
+  handleCollaboratorTextCallbacks,
   showCollaboratorMenu,
 } from "./helpers/collaborators.ts";
-import { askHelpRequestQuestions } from "./helpers/helpRequests.ts";
+import { askHelpRequestQuestions, handleHelpRequestsButtonsCallbacks, handleHelpRequestsTextCallbacks } from "./helpers/helpRequests.ts";
 import {
   askMotherFormQuestions,
   checkMotherExists,
+  handleMotherButtonsCallbacks,
+  handleMotherTextCallbacks,
   showMainMotherMenu,
-  showMotherDataMenu,
-  showMotherHelpRequestsMenu,
 } from "./helpers/mothers.ts";
 import { supabase } from "./helpers/supabase.ts";
-
-const bot = new Bot(Deno.env.get("TELEGRAM_BOT_TOKEN") || "");
+import telegramBot from "./helpers/bot.ts";
+import {
+  handleAdministrationButtonsCallbacks,
+  handleAdministrationTextCallbacks,
+  isAdministrator,
+  showAdministrationMenu,
+} from "./helpers/administration.ts";
 
 export enum AvailableRoles {
   MOTHER,
   COLLABORATOR,
+  ADMINISTRATOR,
 }
 
 export interface SessionData {
@@ -33,15 +37,37 @@ export interface SessionData {
   collaboratorAnswers?: string[]; // Respuestas acumuladas del formulario de colaboradores
   helpRequestAnswers?: string[]; // Respuestas acumuladas del formulario de solicitud de ayuda
   role?: AvailableRoles; // Rol del usuario
+
+  currentEditingField?: string;
 }
 
-async function flushSessionForms(ctx: any) {
+export const MAIN_PROFESSIONAL_CHAT_ID = -1002266155232;
+export const BLACKLISTED_CHAT_IDS = [MAIN_PROFESSIONAL_CHAT_ID];
+
+export function isBlacklisted(ctx: any) {
+  return BLACKLISTED_CHAT_IDS.includes(ctx.from?.id);
+}
+
+export async function showRegistrationMainMenu(ctx: any) {
+  await ctx.reply("Bienvenido. ¿Eres madre o profesional?", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "Madre", callback_data: "role_madre" }],
+        [{ text: "Profesional", callback_data: "role_colaborador" }],
+      ],
+    },
+  });
+}
+
+export async function flushSessionForms(ctx: any) {
+  // Function para resetear todos los states de los formularios en la sesión
   ctx.session.motherQuestionIndex = undefined;
   ctx.session.collaboratorQuestionIndex = undefined;
   ctx.session.helpRequestQuestionIndex = undefined;
   ctx.session.motherAnswers = [];
   ctx.session.collaboratorAnswers = [];
   ctx.session.helpRequestAnswers = [];
+  ctx.session.currentEditingField = undefined;
 }
 
 const initialSessionData: SessionData = {
@@ -51,16 +77,11 @@ const initialSessionData: SessionData = {
   motherAnswers: [],
   collaboratorAnswers: [],
   helpRequestAnswers: [],
-  role: undefined,
 };
 
 const supabaseSessionStorage = {
   async read(key: string): Promise<SessionData | undefined> {
-    const { data, error } = await supabase
-      .from("telegram_grammy_sessions")
-      .select("*")
-      .eq("session_id", key)
-      .single();
+    const { data, error } = await supabase.from("telegram_grammy_sessions").select("*").eq("session_id", key).single();
 
     if (error) {
       console.error("Error reading session from database:", error);
@@ -91,10 +112,7 @@ const supabaseSessionStorage = {
   },
 
   async delete(key: string): Promise<void> {
-    const { error } = await supabase
-      .from("telegram_grammy_sessions")
-      .delete()
-      .eq("session_id", key);
+    const { error } = await supabase.from("telegram_grammy_sessions").delete().eq("session_id", key);
 
     if (error) {
       console.error("Error deleting session from database:", error);
@@ -103,7 +121,7 @@ const supabaseSessionStorage = {
 };
 
 // Middleware para usar el almacenamiento de sesión en Supabase
-bot.use(
+telegramBot.use(
   session({
     initial: (): SessionData => initialSessionData,
     storage: supabaseSessionStorage,
@@ -111,80 +129,152 @@ bot.use(
 );
 
 // Comando /start para iniciar el flujo de selección
-bot.command("start", async (ctx) => {
+telegramBot.command("start", async (ctx) => {
+  if (isBlacklisted(ctx)) {
+    return;
+  }
+
+  if (isAdministrator(ctx)) {
+    console.debug("User is administrator");
+    await showAdministrationMenu(ctx);
+
+    return;
+  }
+
+  // If the user has no session role, ensure all the data is reset
+  if (!ctx.session.role) {
+    await flushSessionForms(ctx);
+  }
+
+  // If the user is a mother, check if they exist in the database
   if (ctx.session.role === AvailableRoles.MOTHER) {
+    console.debug("User is mother, checking if exists in database");
     const motherExists = await checkMotherExists(ctx.from?.id);
     if (motherExists) {
+      // Mother exists, show main mother menu
+      console.debug("Mother exists, showing main mother menu");
       return await showMainMotherMenu(ctx);
+    } else {
+      // If mother doesn't exist, reset the session
+      console.warn("Mother doesn't exist, resetting session");
+      await flushSessionForms(ctx);
+      ctx.session.role = undefined;
     }
   }
 
-  await ctx.reply("Bienvenido. ¿Eres madre o colaborador?", {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "Madre", callback_data: "role_madre" }],
-        [{ text: "Colaborador", callback_data: "role_colaborador" }],
-      ],
-    },
-  });
+  // Safeguard to check if a professional exists in the database if they have the role
+  if (ctx.session.role === AvailableRoles.COLLABORATOR) {
+    console.debug("User is collaborator, checking if exists in database");
+    const collaboratorExists = await checkCollaboratorExists(ctx.from?.id);
+
+    if (collaboratorExists) {
+      // Collaborator exists, show main collaborator menu
+      console.debug("Collaborator exists, showing main collaborator menu");
+      return await showCollaboratorMenu(ctx);
+    } else {
+      // If collaborator doesn't exist, reset the session
+      console.warn("Collaborator doesn't exist, resetting session");
+      await flushSessionForms(ctx);
+      ctx.session.role = undefined;
+    }
+  }
+
+  await showRegistrationMainMenu(ctx);
 });
 
 // Manejo de las respuestas a botones
-bot.on("callback_query:data", async (ctx) => {
+telegramBot.on("callback_query:data", async (ctx) => {
+  if (isBlacklisted(ctx)) {
+    return;
+  }
+
+  console.debug("Received callback query");
+  console.debug("Session:", ctx.session);
+  console.debug("Callback data:", ctx.callbackQuery?.data);
+
   const choice = ctx.callbackQuery?.data;
 
+  // Gestión de administración
+  if (isAdministrator(ctx)) {
+    await handleAdministrationButtonsCallbacks(ctx);
+
+    return;
+  }
+
+  // Handlers for mother question callbacks
+  if (
+    ctx.session.role === AvailableRoles.MOTHER ||
+    ctx.session.motherQuestionIndex !== undefined ||
+    choice.startsWith("helpRequest_attend_")
+  ) {
+    console.debug("Handling mother question callbacks");
+    await handleHelpRequestsButtonsCallbacks(ctx);
+    await handleMotherButtonsCallbacks(ctx);
+
+    return;
+  }
+
+  // Handlers for collaborator question callbacks
+  if (ctx.session.role === AvailableRoles.COLLABORATOR || ctx.session.collaboratorQuestionIndex !== undefined) {
+    console.debug("Handling collaborator question callbacks");
+    await handleCollaboratorButtonsCallbacks(ctx);
+
+    return;
+  }
+
   if (choice === "role_madre") {
-    await ctx.reply(
-      "Gracias por tu interés. Vamos a completar el formulario inicial."
-    );
-    await flushSessionForms(ctx);
+    console.debug("New user selected role madre");
+
+    await ctx.reply("Gracias. Vamos a completar el formulario inicial para crear la conexión madre-profesional.");
+    await flushSessionForms(ctx); // Resetear los formularios en la sesión
     await askMotherFormQuestions(ctx, 0); // Inicia las preguntas para madre
   }
 
   if (choice === "role_colaborador") {
-    await ctx.reply(
-      "Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional."
-    );
+    console.debug("New user selected role colaborador");
+
+    await ctx.reply("Gracias por tu interés en colaborar. Vamos a completar el formulario de profesional.");
     await flushSessionForms(ctx);
     await askCollaboratorFormQuestions(ctx, 0); // Inicia las preguntas para colaborador
-  }
-
-  if (choice === "mother_pedir_ayuda") {
-    await flushSessionForms(ctx);
-    await askHelpRequestQuestions(ctx, 0); // Iniciamos el formulario de solicitud
-  }
-
-  if (choice === "mother_mis_datos") {
-    await showMotherDataMenu(ctx);
-  }
-
-  if (choice === "mother_mis_solicitudes") {
-    await showMotherHelpRequestsMenu(ctx);
   }
 });
 
 // Respuesta a mensajes de texto (principalmente para responder formularios)
-bot.on("message:text", async (ctx) => {
+telegramBot.on("message:text", async (ctx) => {
+  if (isBlacklisted(ctx)) {
+    return;
+  }
+
+  console.debug("Received text message");
+  console.debug("Session:", ctx.session);
+  console.debug("Message text:", ctx.message.text);
+  // Gestión de administración
+  if (isAdministrator(ctx)) {
+    await handleAdministrationTextCallbacks(ctx);
+
+    return;
+  }
+
   // Primero, comprobar si se está rellenando algún formulario
-  if (ctx.session?.motherQuestionIndex != undefined) {
-    const questionIndex = ctx.session.motherQuestionIndex;
-    ctx.session.motherAnswers[questionIndex] = ctx.message.text;
-    await askMotherFormQuestions(ctx, questionIndex + 1);
+
+  if (ctx.session.collaboratorQuestionIndex != undefined || ctx.session.role === AvailableRoles.COLLABORATOR) {
+    console.debug("Handling collaborator text callbacks");
+    await handleCollaboratorTextCallbacks(ctx);
   }
-  if (ctx.session.collaboratorQuestionIndex != undefined) {
-    const questionIndex = ctx.session.collaboratorQuestionIndex;
-    ctx.session.collaboratorAnswers[questionIndex] = ctx.message.text;
-    await askCollaboratorFormQuestions(ctx, questionIndex + 1);
+
+  if (ctx.session.motherQuestionIndex != undefined || ctx.session.role === AvailableRoles.MOTHER) {
+    console.debug("Handling mother text callbacks");
+    await handleMotherTextCallbacks(ctx);
   }
-  if (ctx.session.helpRequestQuestionIndex != null) {
-    const questionIndex = ctx.session.helpRequestQuestionIndex;
-    ctx.session.helpRequestAnswers[questionIndex] = ctx.message.text;
-    await askHelpRequestQuestions(ctx, questionIndex + 1);
+
+  if (ctx.session.role === AvailableRoles.MOTHER) {
+    console.debug("Handling help request text callbacks");
+    await handleHelpRequestsTextCallbacks(ctx);
   }
 });
 
 // Comando /ayuda para solicitar asistencia específica
-bot.command("ayuda", async (ctx) => {
+telegramBot.command("ayuda", async (ctx) => {
   const userId = ctx.from?.id;
 
   if (ctx.role === AvailableRoles.MOTHER) {
@@ -204,12 +294,34 @@ bot.command("ayuda", async (ctx) => {
     }
   }
 
-  await ctx.reply(
-    "Primero te debes registrar como persona afectada en el sistema usando el comando /start."
-  );
+  await ctx.reply("Primero te debes registrar como persona afectada en el sistema usando el comando /start.");
 });
 
-const handleUpdate = webhookCallback(bot, "std/http");
+telegramBot.command("menu", async (ctx) => {
+  const userId = ctx.from?.id;
+
+  if (ctx.role === AvailableRoles.MOTHER) {
+    const motherExists = await checkMotherExists(userId); // Verificar si la madre ya está registrada
+    if (motherExists) {
+      await showMainMotherMenu(ctx);
+      return;
+    }
+  }
+
+  if (ctx.role === AvailableRoles.COLLABORATOR) {
+    const collaboratorExists = await checkCollaboratorExists(userId);
+    if (collaboratorExists) {
+      await showCollaboratorMenu(ctx);
+      return;
+    }
+  }
+
+  await ctx.reply("Primero te debes registrar como persona afectada en el sistema usando el comando /start.");
+});
+
+/* -------------------------------- Handlers -------------------------------- */
+// Handler para manejar las actualizaciones de Telegram
+const handleUpdate = webhookCallback(telegramBot, "std/http");
 
 Deno.serve(async (req) => {
   try {
